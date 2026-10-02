@@ -257,7 +257,7 @@ class MovieDataEngine:
         num_cohort = len(ratings_list)
         if num_cohort >= 5:
             confidence = "high"
-        elif num_cohort >= 2:
+        elif num_cohort >= 3:
             confidence = "medium"
         else:
             confidence = "low (sparse cohort sample)"
@@ -527,6 +527,8 @@ class MovieDataEngine:
             "user_avg_rating": profile["avg_rating"],
             "cohort_avg_rating": cohort["avg_rating"],
             "cohort_num_ratings": cohort["num_ratings"],
+            "cohort_confidence": cohort.get("confidence"),
+            "cohort_global_avg": cohort.get("global_avg_rating"),
             "cohort_ratings": cohort_detail,
             "is_blind_spot": is_blind_spot,
         }

@@ -167,12 +167,8 @@ class MovieAgent:
         dynamic target movie extraction, and explicit genre include/exclude extraction.
         """
         q = user_message.lower().strip()
-        limit = 1 if any(w in q for w in ["1 tên phim", "1 phim", "1 bộ phim", "một phim", "one movie", "1 movie"]) else 5
-
-        if any(w in q for w in ["xin chào", "chào", "hello", "hi", "bạn là ai", "who are you", "giới thiệu"]):
-            return {"intent": "greeting", "limit": limit}
-
-        if any(w in q for w in ["tại sao", "vì sao", "lý do", "why would i like", "why do you think", "giải thích"]):
+        # 1. High-priority specific intent triggers (checked first to prevent false matches on generic words like 'think')
+        if any(w in q for w in ["tại sao", "vì sao", "lý do", "why would i like", "why do you think", "why i would like", "giải thích"]):
             target_movie = None
             if "pulp fiction" in q:
                 target_movie = "Pulp Fiction"
@@ -182,16 +178,7 @@ class MovieAgent:
                 target_movie = "Toy Story"
             return {"intent": "why_recommendation", "target_movie": target_movie, "limit": 1}
 
-        if any(w in q for w in ["tôi thích", "gu của tôi", "sở thích của tôi", "tôi xem gì nhiều nhất", "lịch sử của tôi", "tôi đã xem"]):
-            return {"intent": "user_profile", "limit": limit}
-
-        if any(w in q for w in ["lâu rồi", "chưa xem", "xem ít nhất", "lâu nhất", "cũ nhất", "long ago", "longest unwatched"]):
-            return {"intent": "oldest_or_underwatched", "time_filter": "longest_unwatched", "limit": limit}
-
-        if any(w in q for w in ["điểm mù", "blind spot", "bỏ lỡ", "thể loại nào tôi chưa", "chưa khám phá"]):
-            return {"intent": "blind_spot", "genres_include": ["blind_spot"], "limit": limit if limit != 1 else 3}
-
-        if any(w in q for w in ["cùng gu", "giống tôi", "similar taste", "nghĩ gì về", "thấy thế nào về"]):
+        if any(w in q for w in ["cùng gu", "giống tôi", "similar taste", "nghĩ gì về", "thấy thế nào về", "think of", "think about"]):
             target_movie = "Pulp Fiction"
             if "inception" in q:
                 target_movie = "Inception"
@@ -200,6 +187,11 @@ class MovieAgent:
             elif "toy story" in q:
                 target_movie = "Toy Story"
             return {"intent": "cohort_opinion", "target_movie": target_movie, "limit": limit}
+
+        # 2. Greeting (use word boundary regex to avoid false triggers like 'think' -> 'hi')
+        word_tokens = set(re.findall(r"\b\w+\b", q))
+        if any(w in word_tokens for w in ["xin", "chào", "hello", "hi", "hey"]) or any(p in q for p in ["bạn là ai", "who are you", "giới thiệu"]):
+            return {"intent": "greeting", "limit": limit}
 
         # Extract genre constraints
         genres_exc = []
@@ -351,13 +343,24 @@ class MovieAgent:
                 return f"Không thể giải thích: {exp['error']}"
             t = exp.get("title", "phim này")
             g = exp.get("genres", "")
-            reasons = exp.get("reasons", [])
-            cohort = exp.get("cohort_stats", {})
+            mg = ", ".join(exp.get("matching_genres", []))
+            u_avg = exp.get("user_avg_rating")
+            c_cnt = exp.get("cohort_num_ratings", 0)
+            c_avg = exp.get("cohort_avg_rating")
+            c_glob = exp.get("cohort_global_avg")
+            
             lines = [f"Lý do bạn (User #{user_id}) sẽ thích **{t}** ({g}):"]
-            for r in reasons:
-                lines.append(f"• {r}")
-            if cohort.get("count", 0) > 0:
-                lines.append(f"• Nhóm người có gu tương đồng ({cohort['count']} người) đánh giá trung bình {cohort['avg_rating']}★.")
+            if mg:
+                lines.append(f"• Thể loại khớp với gu phim yêu thích của bạn: **{mg}**.")
+            if u_avg:
+                lines.append(f"• Điểm đánh giá trung bình lịch sử của bạn là **{u_avg}★**, rất phù hợp với phong cách phim này.")
+            if c_cnt > 0:
+                cohort_info = f"• Trong nhóm người có gu tương đồng ({c_cnt} người đã xem), điểm TB là **{c_avg}★**"
+                if c_glob:
+                    cohort_info += f" (toàn cộng đồng: {c_glob}★)"
+                lines.append(cohort_info + ".")
+            if exp.get("is_blind_spot"):
+                lines.append("• Phim thuộc thể loại điểm mù tiềm năng giúp bạn mở rộng trải nghiệm điện ảnh.")
             return "\n".join(lines)
 
         # P0 FIX: Formatter for cohort opinion with confidence estimation

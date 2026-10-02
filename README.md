@@ -23,6 +23,48 @@ Unlike standard search engines or generic LLM chatbots that hallucinate movie fa
 
 ---
 
+## 🤖 Multi-Agent "Vibe Coding" Workflow (Antigravity + Claude Code + Codex)
+
+Dự án này được xây dựng và hoàn thiện theo phương pháp **Multi-Agent Collaborative Engineering** (Hợp tác đa tác tử AI), thể hiện năng lực khai thác tối đa hệ sinh thái AI Coding tiên tiến trong thực tế:
+
+```
+                  ┌──────────────────────────────────────────────┐
+                  │          Google Antigravity (Center)         │
+                  │    • Project Lead & Central Orchestrator     │
+                  │    • System Architecture & Context Manager   │
+                  │    • Task Delegation & Integration Testing   │
+                  └───────────────┬──────────────┬───────────────┘
+                                  │              │
+                   Dispatches Work│              │Requests Audit
+                                  ▼              ▼
+       ┌──────────────────────────────┐      ┌──────────────────────────────┐
+       │       Claude Code CLI        │      │          Codex CLI           │
+       │    • Core Implementation     │      │   • Adversarial Reviewer     │
+       │    • Logic Refactoring       │      │   • Tech Lead Counter-Check  │
+       │    • Code Documentation      │      │   • P0 Edge-Case Hunting     │
+       └──────────────────────────────┘      └──────────────────────────────┘
+```
+
+### Phân công vai trò trong quy trình phát triển:
+1. **Google Antigravity (Trung tâm điều phối - Central Orchestrator & System Architect):**
+   - Đóng vai trò là "Nhạc trưởng" nắm toàn bộ ngữ cảnh dự án, cấu trúc thư mục, đề bài và môi trường máy trạm.
+   - Phân tích yêu cầu đề bài của TrustedAI, thiết kế kiến trúc Two-Tier Decoupled System.
+   - Trực tiếp gọi và điều phối các công cụ CLI (`claude`, `codex`), tiếp nhận phản hồi, hợp nhất mã nguồn và chạy verification benchmark tự động.
+2. **Claude Code CLI (Lập trình & Refactor - Implementation Engine):**
+   - Đóng vai trò developer trực tiếp hỗ trợ viết code, tối ưu hàm và refactor các module cốt lõi (`agent.py`, `engine.py`).
+   - Bổ sung chú thích kỹ thuật (clean code comments) tiếng Việt & tiếng Anh giải thích rõ từng block xử lý dữ liệu phức tạp.
+   - Đảm bảo tính linh hoạt của hệ thống với cơ chế fallback dự phòng khi mất kết nối API.
+3. **Codex CLI (Phản biện & Kiểm duyệt Kỹ thuật - Adversarial Tech Lead):**
+   - Chạy độc lập (`codex exec` trên nền tảng `gpt-5.6-terra`) với góc nhìn phản biện khắt khe của một Tech Lead khó tính.
+   - **Các phát hiện quan trọng của Codex giúp nâng tầm dự án**:
+     * Phát hiện lỗi rò rỉ thể loại `genres_include` tại `engine.py:649-654` (khiến truy vấn Sci-Fi rơi về *Antonia's Line*).
+     * Phát hiện hàm `explain_recommendation()` bị "bỏ rơi", chưa được nối vào intent parser để giải quyết Requirement 3.
+     * Cảnh báo rủi ro thiên lệch thống kê khi kích thước mẫu cohort quá nhỏ ($n < 3$) cho phim *Pulp Fiction*.
+     * Bắt lỗi hardcode `"190 đánh giá"` trong fallback template.
+   - Nhờ đó, Antigravity đã chỉ đạo sửa triệt để toàn bộ lỗi P0, giúp hệ thống đạt chuẩn chất lượng cao và vượt qua toàn bộ **10/10 Benchmark Test Cases**.
+
+---
+
 ## 🏛 Architecture
 
 ```

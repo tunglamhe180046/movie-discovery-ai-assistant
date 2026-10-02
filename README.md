@@ -25,7 +25,7 @@ Unlike standard search engines or generic LLM chatbots that hallucinate movie fa
 
 ## 🤖 Multi-Agent "Vibe Coding" Workflow (Antigravity + Claude Code + Codex)
 
-Dự án này được xây dựng và hoàn thiện theo phương pháp **Multi-Agent Collaborative Engineering** (Hợp tác đa tác tử AI), thể hiện năng lực khai thác tối đa hệ sinh thái AI Coding tiên tiến trong thực tế:
+This project was built, audited, and refined using a **Multi-Agent Collaborative Engineering** workflow, demonstrating how modern AI coding assistants can be orchestrated synergistically to produce production-grade, verifiable software:
 
 ```
                   ┌──────────────────────────────────────────────┐
@@ -45,23 +45,23 @@ Dự án này được xây dựng và hoàn thiện theo phương pháp **Multi
        └──────────────────────────────┘      └──────────────────────────────┘
 ```
 
-### Phân công vai trò trong quy trình phát triển:
-1. **Google Antigravity (Trung tâm điều phối - Central Orchestrator & System Architect):**
-   - Đóng vai trò là "Nhạc trưởng" nắm toàn bộ ngữ cảnh dự án, cấu trúc thư mục, đề bài và môi trường máy trạm.
-   - Phân tích yêu cầu đề bài của TrustedAI, thiết kế kiến trúc Two-Tier Decoupled System.
-   - Trực tiếp gọi và điều phối các công cụ CLI (`claude`, `codex`), tiếp nhận phản hồi, hợp nhất mã nguồn và chạy verification benchmark tự động.
-2. **Claude Code CLI (Lập trình & Refactor - Implementation Engine):**
-   - Đóng vai trò developer trực tiếp hỗ trợ viết code, tối ưu hàm và refactor các module cốt lõi (`agent.py`, `engine.py`).
-   - Bổ sung chú thích kỹ thuật (clean code comments) tiếng Việt & tiếng Anh giải thích rõ từng block xử lý dữ liệu phức tạp.
-   - Đảm bảo tính linh hoạt của hệ thống với cơ chế fallback dự phòng khi mất kết nối API.
-3. **Codex CLI (Phản biện & Kiểm duyệt Kỹ thuật - Adversarial Tech Lead):**
-   - Chạy độc lập (`codex exec` trên nền tảng `gpt-5.6-terra`) với góc nhìn phản biện khắt khe của một Tech Lead khó tính.
-   - **Các phát hiện quan trọng của Codex giúp nâng tầm dự án**:
-     * Phát hiện lỗi rò rỉ thể loại `genres_include` tại `engine.py:649-654` (khiến truy vấn Sci-Fi rơi về *Antonia's Line*).
-     * Phát hiện hàm `explain_recommendation()` bị "bỏ rơi", chưa được nối vào intent parser để giải quyết Requirement 3.
-     * Cảnh báo rủi ro thiên lệch thống kê khi kích thước mẫu cohort quá nhỏ ($n < 3$) cho phim *Pulp Fiction*.
-     * Bắt lỗi hardcode `"190 đánh giá"` trong fallback template.
-   - Nhờ đó, Antigravity đã chỉ đạo sửa triệt để toàn bộ lỗi P0, giúp hệ thống đạt chuẩn chất lượng cao và vượt qua toàn bộ **10/10 Benchmark Test Cases**.
+### Division of Responsibilities in Development:
+1. **Google Antigravity (Central Orchestrator & System Architect):**
+   - Served as the master conductor managing repository context, directory structure, prompt requirements, and local execution environment.
+   - Designed the Two-Tier Decoupled System architecture based on TrustedAI requirements.
+   - Programmatically invoked and coordinated the CLI sub-agents (`claude`, `codex`), merged code changes, resolved conflicts, and executed end-to-end benchmark validations.
+2. **Claude Code CLI (Implementation & Refactoring Engine):**
+   - Served as the primary implementation engineer, authoring and refactoring core algorithmic modules (`agent.py`, `engine.py`).
+   - Added comprehensive technical code comments detailing data flows and fallback routines.
+   - Ensured high fault-tolerance with automated offline recovery mechanisms when API limits are reached.
+3. **Codex CLI (Adversarial Code Reviewer & Tech Lead):**
+   - Executed non-interactively (`codex exec` on `gpt-5.6-terra`) providing critical, adversarial code review from a Tech Lead perspective.
+   - **Key P0 Bugs Discovered & Mitigated by Codex**:
+     * Caught the candidate leakage bug in `engine.py:649-654` where `genres_include` post-filtering failed when top-K lacked matching genres (causing Sci-Fi queries to return non-Sci-Fi movies).
+     * Identified that `explain_recommendation()` was orphaned and not connected to intent parsing for Requirement 3.
+     * Flagged statistical vulnerability on sparse cohort queries ($n < 3$ for *Pulp Fiction*), leading to the addition of sample confidence indicators.
+     * Flagged hardcoded profile strings (`"190 đánh giá"`) in fallback formatters.
+   - Through this adversarial feedback loop, Antigravity directed full remediation of all P0 issues, bringing the test suite to **10/10 Passed**.
 
 ---
 
@@ -130,12 +130,12 @@ Start a conversation for any user (e.g., User 1, 15, or 30):
 ```bash
 python main.py --user 1
 ```
-Try asking natural language questions:
-* *"Tối nay xem gì nhẹ nhàng, không phải hoạt hình?"* (Constraints: Comedy/Drama, Exclude: Animation)
-* *"Những người có gu giống tôi nghĩ gì về Pulp Fiction?"* (Cohort aggregation & sample confidence)
-* *"Tại sao tôi lại thích Inception?"* (Grounded explainability using rating history & cohort scores)
-* *"Điểm mù của tôi là gì và cho tôi phim tiêu biểu để bắt đầu?"* (Statistical distribution contrast)
-* *"Tìm một phim khoa học viễn tưởng tôi chưa xem, đừng kinh dị."* (Strict include Sci-Fi, exclude Horror)
+Try asking natural language questions (English or Vietnamese):
+* *"What should I watch tonight? Something light, no animation."* (Constraints: Comedy/Drama, Exclude: Animation)
+* *"What do people with similar taste to mine think about Pulp Fiction?"* (Cohort aggregation & sample confidence)
+* *"Why do you think I'd like Inception?"* (Grounded explainability using rating history & cohort scores)
+* *"What's my blind spot? What genres am I missing?"* (Statistical distribution contrast)
+* *"Find me a sci-fi movie I haven't watched, no horror."* (Strict include Sci-Fi, exclude Horror)
 
 ### 2. Run Automated Test Suite
 Run the 10 benchmark test cases:

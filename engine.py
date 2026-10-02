@@ -50,6 +50,11 @@ class MovieDataEngine:
         merged_genres = self.ratings.merge(self.movies[["movieId", "genre_list"]], on="movieId")
         self._cached_global_genre_counts = merged_genres.explode("genre_list")["genre_list"].value_counts()
 
+        # Dynamic User Memory (Personalization notes, custom ratings, and stated preferences)
+        self.user_memory_path = self.data_dir / "user_memory.json"
+        self.user_memory: dict[str, dict] = self._load_user_memory()
+        self._inject_custom_memory_ratings()
+
         # Build user-item matrix and TF-IDF index
         self._user_item_matrix: pd.DataFrame | None = None
         self._tfidf_vectorizer: TfidfVectorizer | None = None
@@ -57,6 +62,131 @@ class MovieDataEngine:
 
         self._build_user_item_matrix()
         self._build_tfidf_index()
+
+    def _load_user_memory(self) -> dict[str, dict]:
+        if self.user_memory_path.exists():
+            try:
+                with open(self.user_memory_path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception:
+                return {}
+        return {}
+
+    def _save_user_memory(self) -> None:
+        try:
+            with open(self.user_memory_path, "w", encoding="utf-8") as f:
+                json.dump(self.user_memory, f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+
+    def _inject_custom_memory_ratings(self) -> None:
+        """Inject user ratings saved in memory into the active ratings DataFrame."""
+        rows_to_add = []
+        for uid_str, udata in self.user_memory.items():
+            try:
+                uid = int(uid_str)
+            except ValueError:
+                continue
+            for cr in udata.get("custom_ratings", []):
+                rows_to_add.append({
+                    "userId": uid,
+                    "movieId": cr["movieId"],
+                    "rating": float(cr["rating"]),
+                    "timestamp": cr.get("timestamp", int(pd.Timestamp.now().timestamp()))
+                })
+        if rows_to_add:
+            self.ratings = pd.concat([self.ratings, pd.DataFrame(rows_to_add)], ignore_index=True)
+
+    def record_user_preference(
+        self,
+        user_id: int,
+        favorite_genres: list[str] | None = None,
+        disliked_genres: list[str] | None = None,
+        notes: str | None = None,
+    ) -> dict:
+        """Dynamically record, update, or change user's stated taste in persistent memory."""
+        uid_str = str(user_id)
+        if uid_str not in self.user_memory:
+            self.user_memory[uid_str] = {
+                "favorite_genres": [],
+                "disliked_genres": [],
+                "custom_ratings": [],
+                "notes": ""
+            }
+
+        mem = self.user_memory[uid_str]
+        if favorite_genres:
+            existing = set(mem.get("favorite_genres", []))
+            for g in favorite_genres:
+                existing.add(g)
+            mem["favorite_genres"] = list(existing)
+
+        if disliked_genres:
+            existing_d = set(mem.get("disliked_genres", []))
+            for g in disliked_genres:
+                existing_d.add(g)
+            mem["disliked_genres"] = list(existing_d)
+
+        if notes:
+            mem["notes"] = notes
+
+        self._save_user_memory()
+        return {
+            "user_id": user_id,
+            "status": "updated",
+            "favorite_genres": mem.get("favorite_genres", []),
+            "disliked_genres": mem.get("disliked_genres", []),
+            "notes": mem.get("notes", "")
+        }
+
+    def add_user_rating(self, user_id: int, movie_title_or_id: str | int, rating: float) -> dict:
+        """Record a live movie rating dynamically into persistent memory and live DataFrame."""
+        movie_id = self._resolve_movie_id(movie_title_or_id)
+        if movie_id is None:
+            return {"error": f"Không tìm thấy phim '{movie_title_or_id}' trong hệ thống."}
+
+        movie_row = self._get_movie_row(movie_id)
+        rating_val = max(0.5, min(5.0, float(rating)))
+
+        uid_str = str(user_id)
+        if uid_str not in self.user_memory:
+            self.user_memory[uid_str] = {
+                "favorite_genres": [],
+                "disliked_genres": [],
+                "custom_ratings": [],
+                "notes": ""
+            }
+
+        # Deduplicate and append
+        self.user_memory[uid_str]["custom_ratings"] = [
+            r for r in self.user_memory[uid_str].get("custom_ratings", []) if r.get("movieId") != movie_id
+        ]
+        self.user_memory[uid_str]["custom_ratings"].append({
+            "movieId": int(movie_id),
+            "title": movie_row["title"],
+            "rating": rating_val,
+            "genres": movie_row["genres"],
+            "timestamp": int(pd.Timestamp.now().timestamp())
+        })
+        self._save_user_memory()
+
+        # Append to live self.ratings DataFrame & re-pivot
+        new_row = pd.DataFrame([{
+            "userId": user_id,
+            "movieId": movie_id,
+            "rating": rating_val,
+            "timestamp": int(pd.Timestamp.now().timestamp())
+        }])
+        self.ratings = pd.concat([self.ratings, new_row], ignore_index=True)
+        self._build_user_item_matrix()
+
+        return {
+            "user_id": user_id,
+            "movie_id": movie_id,
+            "title": movie_row["title"],
+            "rating": rating_val,
+            "status": "rating_saved"
+        }
 
     def _build_user_item_matrix(self) -> None:
         self._user_item_matrix = self.ratings.pivot_table(
@@ -122,15 +252,23 @@ class MovieDataEngine:
     # ------------------------------------------------------------------
 
     def get_user_profile(self, user_id: int) -> dict:
+        uid_str = str(user_id)
+        custom_mem = self.user_memory.get(uid_str, {})
+        custom_favs = custom_mem.get("favorite_genres", [])
+        custom_dislikes = custom_mem.get("disliked_genres", [])
+
         user_ratings = self.ratings[self.ratings["userId"] == user_id]
         if user_ratings.empty:
             return {
                 "user_id": user_id,
                 "num_ratings": 0,
                 "avg_rating": None,
-                "top_genres": [],
+                "top_genres": [{"genre": g, "count": 1} for g in custom_favs],
+                "disliked_genres": custom_dislikes,
                 "top_movies": [],
                 "blind_spots": [],
+                "has_custom_profile": bool(custom_favs or custom_dislikes),
+                "notes": custom_mem.get("notes", ""),
             }
 
         num_ratings = len(user_ratings)
@@ -342,6 +480,17 @@ class MovieDataEngine:
         # Normalize exclude_genres & include_genres for case-insensitive matching
         eg_lower = [g.lower() for g in exclude_genres] if exclude_genres else []
         ig_lower = [g.lower() for g in include_genres] if include_genres else []
+
+        # Check user memory for dynamic preferences (Assistant Memory Feature)
+        uid_str = str(user_id)
+        custom_mem = self.user_memory.get(uid_str, {})
+        mem_dislikes = custom_mem.get("disliked_genres", [])
+        mem_favs = custom_mem.get("favorite_genres", [])
+        if mem_dislikes:
+            eg_lower = list(set(eg_lower + [g.lower() for g in mem_dislikes]))
+        if not ig_lower and not query and mem_favs:
+            include_genres = mem_favs
+            ig_lower = [g.lower() for g in mem_favs]
 
         similar_users = self.get_similar_users(user_id, top_n=25, min_common_ratings=3)
         similar_user_ids = [u["userId"] for u in similar_users]
@@ -702,10 +851,37 @@ class MovieDataEngine:
                     "explanation": explanation,
                     "user_id": user_id
                 }
+        # 3c. Dynamic Taste Update & Preference Recording (Assistant Memory)
+        if intent == "update_taste":
+            stated_favs = params.get("genres_include") or params.get("favorite_genres")
+            stated_dislikes = params.get("genres_exclude") or params.get("disliked_genres")
+            target_movie = params.get("target_movie")
+            rating_val = params.get("rating")
+            notes = params.get("notes")
+
+            result_data = {}
+            if stated_favs or stated_dislikes or notes:
+                pref_res = self.record_user_preference(
+                    user_id=user_id,
+                    favorite_genres=stated_favs,
+                    disliked_genres=stated_dislikes,
+                    notes=notes
+                )
+                result_data.update(pref_res)
+
+            if target_movie and rating_val:
+                rating_res = self.add_user_rating(
+                    user_id=user_id,
+                    movie_title_or_id=target_movie,
+                    rating=float(rating_val)
+                )
+                result_data["rating_record"] = rating_res
+
             return {
-                "intent": "why_recommendation",
-                "explanation": {"error": "Không tìm thấy phim để giải thích lý do."},
-                "user_id": user_id
+                "intent": "update_taste",
+                "result": result_data,
+                "user_id": user_id,
+                "profile": self.get_user_profile(user_id)
             }
 
         # 4. Pure plot semantic search

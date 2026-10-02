@@ -39,27 +39,34 @@ def display_welcome_banner(user_id: int, profile: dict) -> None:
     table.add_column("Attribute", style="dim", width=22)
     table.add_column("Details", style="cyan")
 
-    table.add_row("Ratings Count", str(profile.get("num_ratings", 0)))
-    table.add_row("Average Rating", f"{profile.get('avg_rating', 'N/A')} ★")
-
-    top_genres_str = ", ".join([f"{g['genre']} ({g['count']})" for g in profile.get("top_genres", [])[:4]])
-    table.add_row("Favorite Genres", top_genres_str or "None")
-
-    top_movies_str = ", ".join([f"{m['title']} ({m['rating']}★)" for m in profile.get("top_movies", [])[:3]])
-    table.add_row("Top Rated Movies", top_movies_str or "None")
-
-    blind_spots_str = ", ".join([b["genre"] for b in profile.get("blind_spots", [])[:3]])
-    table.add_row("Blind Spots (Missing)", blind_spots_str or "None")
+    num_ratings = profile.get("num_ratings", 0)
+    if num_ratings == 0:
+        table.add_row("Ratings Count", "0 (Người dùng mới / Cold-Start)")
+        table.add_row("Average Rating", "Chưa có đánh giá")
+        favs = ", ".join([g["genre"] for g in profile.get("top_genres", [])])
+        table.add_row("Gu đã lưu", favs or "Chưa thiết lập (Hãy chat để tôi ghi nhớ!)")
+        table.add_row("Thể loại tránh", ", ".join(profile.get("disliked_genres", [])) or "Không có")
+        table.add_row("Ghi chú cá nhân", profile.get("notes") or "Chưa có")
+    else:
+        table.add_row("Ratings Count", str(num_ratings))
+        table.add_row("Average Rating", f"{profile.get('avg_rating', 'N/A')} ★")
+        top_genres_str = ", ".join([f"{g['genre']} ({g['count']})" for g in profile.get("top_genres", [])[:4]])
+        table.add_row("Favorite Genres", top_genres_str or "None")
+        top_movies_str = ", ".join([f"{m['title']} ({m['rating']}★)" for m in profile.get("top_movies", [])[:3]])
+        table.add_row("Top Rated Movies", top_movies_str or "None")
+        blind_spots_str = ", ".join([b["genre"] for b in profile.get("blind_spots", [])[:3]])
+        table.add_row("Blind Spots (Missing)", blind_spots_str or "None")
 
     console.print(table)
     console.print(
         Panel.fit(
             "[bold green]Try sample queries:[/bold green]\n"
             "• [italic]What should I watch tonight?[/italic]\n"
-            "• [italic]I want a dark psychological thriller with a twist[/italic]\n"
+            "• [italic]Gu của tôi là phim hành động và khoa học viễn tưởng, nhớ nhé[/italic] (Cập nhật gu)\n"
+            "• [italic]Tôi vừa xem Inception và chấm 5 sao[/italic] (Lưu đánh giá mới)\n"
             "• [italic]What do people with similar taste to mine think about Pulp Fiction?[/italic]\n"
             "• [italic]I liked Toy Story but I'm tired of animated movies — what else?[/italic]\n"
-            "• [italic]What's my blind spot? What genres am I missing?[/italic]\n"
+            "• [italic]Why do you think I'd like Inception?[/italic] (Grounded explainability)\n"
             "• [yellow]exit[/yellow] or [yellow]quit[/yellow] to end session.",
             title="💡 Quick Tips",
             border_style="blue"

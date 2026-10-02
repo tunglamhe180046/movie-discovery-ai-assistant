@@ -43,12 +43,14 @@ Convert the user's message (Vietnamese or English) into a strict JSON object wit
     * "blind_spot": When user asks about blind spots, genres missed, or recommendations from unexplored genres
     * "cohort_opinion": When user asks what peers/similar users think of a specific movie (e.g. Pulp Fiction, Inception)
     * "why_recommendation": When user asks "why would I like that?", "tại sao tôi lại thích phim đó?", asking for grounded reasoning/explanation
+    * "update_taste": When user states, changes, or asks to save their taste, preferences, or movie ratings (e.g. "gu của tôi là...", "lưu lại gu cho tôi", "tôi thích phim hành động", "tôi ghét kinh dị", "tôi vừa xem Inception chấm 5 sao")
     * "plot_search": When searching by plot description, theme, or mood keywords
     * "recommend": When user asks for general or tailored movie recommendations
 - "search_query_en": English translation of plot/theme query (string or null)
 - "target_movie": Specific movie title mentioned in query (string or null; only set if an actual movie title is mentioned!)
-- "genres_include": List of genres requested (e.g. ["Sci-Fi", "Action"] or [])
-- "genres_exclude": List of genres to strictly avoid (e.g. ["Animation", "Horror"] or [])
+- "genres_include": List of genres requested or stated as favorites (e.g. ["Sci-Fi", "Action"] or [])
+- "genres_exclude": List of genres to strictly avoid or stated as disliked (e.g. ["Animation", "Horror"] or [])
+- "rating": Float number if user is rating a movie (e.g. 5.0, 4.5, 3.0 or null)
 - "time_filter": "longest_unwatched", "least_watched", or null
 - "limit": Integer number of movies requested (default 5; if user asks for 1 movie, set 1)
 
@@ -209,6 +211,24 @@ class MovieAgent:
             genres_inc.append("Comedy")
         if any(w in q for w in ["tâm lý", "drama"]):
             genres_inc.append("Drama")
+
+        # Check if user is declaring taste, updating preferences, or adding a rating
+        if any(w in q for w in ["lưu lại", "nhớ nhé", "ghi nhớ", "đổi gu", "gu của tôi", "tôi thích xem", "tôi thích thể loại", "tôi ghét", "sở thích của tôi là", "chấm", "đánh giá", "remember"]):
+            rating_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:sao|star|\★)", q)
+            rating_val = float(rating_match.group(1)) if rating_match else None
+            target_movie = None
+            for tm in ["Inception", "Pulp Fiction", "Toy Story", "Interstellar", "Star Wars", "Gladiator", "Braveheart"]:
+                if tm.lower() in q:
+                    target_movie = tm
+                    break
+            return {
+                "intent": "update_taste",
+                "genres_include": genres_inc if genres_inc else None,
+                "genres_exclude": genres_exc if genres_exc else None,
+                "target_movie": target_movie,
+                "rating": rating_val,
+                "limit": 1
+            }
 
         if any(w in q for w in ["tâm lý", "đen tối", "plot twist", "kinh dị", "giật gân", "dark psychological thriller"]):
             return {
@@ -376,9 +396,22 @@ class MovieAgent:
             res_str = f"Trong nhóm người có cùng gu với bạn ({cdata.get('similar_users_checked', 0)} người), có {cnt} người đã đánh giá **{t}** với điểm trung bình **{avg}★**."
             if g_avg:
                 res_str += f" (Điểm trung bình toàn cộng đồng: {g_avg}★)."
-            if "low" in conf:
-                res_str += f"\n*Lưu ý: Mẫu cohort khá nhỏ ({cnt} lượt chấm), mang tính chất tham khảo cục bộ.*"
-            return res_str
+        # Formatter for dynamic taste preference & rating recording (Assistant Memory)
+        if intent == "update_taste":
+            res = result.get("result", {})
+            favs = ", ".join(res.get("favorite_genres", []))
+            dislikes = ", ".join(res.get("disliked_genres", []))
+            rating_rec = res.get("rating_record")
+            
+            lines = [f"✅ Đã ghi nhớ cập nhật vào hồ sơ của bạn (User #{user_id}):"]
+            if favs:
+                lines.append(f"• Gu thể loại yêu thích: **{favs}**")
+            if dislikes:
+                lines.append(f"• Thể loại tránh gợi ý: **{dislikes}**")
+            if rating_rec and "title" in rating_rec:
+                lines.append(f"• Đã lưu đánh giá: **{rating_rec['title']}** - **{rating_rec['rating']}★**")
+            lines.append("Từ bây giờ, tôi sẽ tự động cá nhân hóa mọi gợi ý dựa trên sở thích này của bạn!")
+            return "\n".join(lines)
 
         if intent == "blind_spot":
             bs = ", ".join(result.get("blind_spots", []))

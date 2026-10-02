@@ -126,11 +126,31 @@ GROQ_API_KEY=your_groq_api_key
 ## 💻 Running the Application
 
 ### 1. Interactive Terminal CLI
-Start a conversation for any user (e.g., User 1, 15, or 30):
+Launch the assistant interactively:
 ```bash
-python main.py --user 1
+python main.py
 ```
-Try asking natural language questions (English or Vietnamese):
+This displays an interactive account selector for **Users 0 to 4**:
+* **User 0**: *Cold-Start Persona (0 ratings)*. Starts with a blank slate. You can add, remove, and reset preferences anytime!
+* **User 1**: *Action & Adventure Fan (190 ratings, avg 4.33★)*. Missing: Documentary, IMAX.
+* **User 2**: *Drama & Action Enthusiast (15 ratings, avg 4.00★)*.
+* **User 3**: *Critical Sci-Fi Viewer (32 ratings, avg 2.08★)*.
+* **User 4**: *Drama & Romance Lover (166 ratings, avg 3.60★)*.
+
+Or launch directly with a specific user:
+```bash
+python main.py --user 0
+```
+
+#### Dynamic Preference Management (Add, Remove, Reset):
+* **Add Taste:** *"Gu của tôi là thích phim Sci-Fi và Action"* or *"Thêm sở thích phim hoạt hình"*
+* **Remove Taste:** *"Xóa sở thích Sci-Fi khỏi gu của tôi"* or *"Bỏ phim hành động"*
+* **Dislike & Avoid:** *"Tôi ghét phim kinh dị Horror"* (Adds to avoidance list)
+* **Remove Dislike:** *"Bỏ ghét phim kinh dị"* (Removes from avoidance list)
+* **Reset / Clear All:** *"Xóa toàn bộ gu của tôi"* or *"Reset sở thích"* (Restores blank slate)
+* **In-Session Switching:** Type `/switch <0-4>` to instantly swap users without restarting. Type `/profile` to view updated taste.
+
+#### Natural Language Discovery Queries:
 * *"What should I watch tonight? Something light, no animation."* (Constraints: Comedy/Drama, Exclude: Animation)
 * *"What do people with similar taste to mine think about Pulp Fiction?"* (Cohort aggregation & sample confidence)
 * *"Why do you think I'd like Inception?"* (Grounded explainability using rating history & cohort scores)

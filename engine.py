@@ -51,7 +51,7 @@ class MovieDataEngine:
         self._cached_global_genre_counts = merged_genres.explode("genre_list")["genre_list"].value_counts()
 
         # Dynamic User Memory (Personalization notes, custom ratings, and stated preferences)
-        self.user_memory_path = self.data_dir / "user_memory.json"
+        self.user_memory_path = Path(__file__).resolve().parent / "data" / "user_memory.json"
         self.user_memory: dict[str, dict] = self._load_user_memory()
         self._inject_custom_memory_ratings()
 
@@ -102,9 +102,12 @@ class MovieDataEngine:
         user_id: int,
         favorite_genres: list[str] | None = None,
         disliked_genres: list[str] | None = None,
+        remove_favorite_genres: list[str] | None = None,
+        remove_disliked_genres: list[str] | None = None,
+        clear_all: bool = False,
         notes: str | None = None,
     ) -> dict:
-        """Dynamically record, update, or change user's stated taste in persistent memory."""
+        """Dynamically record, add, remove, or clear user's stated taste in persistent memory."""
         uid_str = str(user_id)
         if uid_str not in self.user_memory:
             self.user_memory[uid_str] = {
@@ -115,25 +118,69 @@ class MovieDataEngine:
             }
 
         mem = self.user_memory[uid_str]
+
+        # Reset / Clear all preferences
+        if clear_all:
+            mem["favorite_genres"] = []
+            mem["disliked_genres"] = []
+            mem["notes"] = ""
+            self._save_user_memory()
+            return {
+                "user_id": user_id,
+                "status": "cleared",
+                "message": "Đã xóa toàn bộ sở thích và ghi chú cá nhân của bạn.",
+                "favorite_genres": [],
+                "disliked_genres": [],
+                "notes": ""
+            }
+
+        # 1. Removals
+        removed_favs = []
+        if remove_favorite_genres:
+            rem_f_lower = {g.lower() for g in remove_favorite_genres}
+            curr_favs = mem.get("favorite_genres", [])
+            new_favs = [g for g in curr_favs if g.lower() not in rem_f_lower]
+            removed_favs = [g for g in curr_favs if g.lower() in rem_f_lower]
+            mem["favorite_genres"] = new_favs
+
+        removed_dislikes = []
+        if remove_disliked_genres:
+            rem_d_lower = {g.lower() for g in remove_disliked_genres}
+            curr_dislikes = mem.get("disliked_genres", [])
+            new_dislikes = [g for g in curr_dislikes if g.lower() not in rem_d_lower]
+            removed_dislikes = [g for g in curr_dislikes if g.lower() in rem_d_lower]
+            mem["disliked_genres"] = new_dislikes
+
+        # 2. Additions
+        added_favs = []
         if favorite_genres:
-            existing = set(mem.get("favorite_genres", []))
+            existing = {g.lower() for g in mem.get("favorite_genres", [])}
             for g in favorite_genres:
-                existing.add(g)
-            mem["favorite_genres"] = list(existing)
+                if g.lower() not in existing:
+                    mem["favorite_genres"].append(g)
+                    added_favs.append(g)
+                    existing.add(g.lower())
 
+        added_dislikes = []
         if disliked_genres:
-            existing_d = set(mem.get("disliked_genres", []))
+            existing_d = {g.lower() for g in mem.get("disliked_genres", [])}
             for g in disliked_genres:
-                existing_d.add(g)
-            mem["disliked_genres"] = list(existing_d)
+                if g.lower() not in existing_d:
+                    mem["disliked_genres"].append(g)
+                    added_dislikes.append(g)
+                    existing_d.add(g.lower())
 
-        if notes:
+        if notes is not None:
             mem["notes"] = notes
 
         self._save_user_memory()
         return {
             "user_id": user_id,
             "status": "updated",
+            "added_favorites": added_favs,
+            "removed_favorites": removed_favs,
+            "added_dislikes": added_dislikes,
+            "removed_dislikes": removed_dislikes,
             "favorite_genres": mem.get("favorite_genres", []),
             "disliked_genres": mem.get("disliked_genres", []),
             "notes": mem.get("notes", "")
@@ -855,16 +902,22 @@ class MovieDataEngine:
         if intent == "update_taste":
             stated_favs = params.get("genres_include") or params.get("favorite_genres")
             stated_dislikes = params.get("genres_exclude") or params.get("disliked_genres")
+            remove_favs = params.get("remove_genres_include") or params.get("remove_favorite_genres")
+            remove_dislikes = params.get("remove_genres_exclude") or params.get("remove_disliked_genres")
+            clear_all = bool(params.get("clear_all", False))
             target_movie = params.get("target_movie")
             rating_val = params.get("rating")
             notes = params.get("notes")
 
             result_data = {}
-            if stated_favs or stated_dislikes or notes:
+            if stated_favs or stated_dislikes or remove_favs or remove_dislikes or clear_all or notes is not None:
                 pref_res = self.record_user_preference(
                     user_id=user_id,
                     favorite_genres=stated_favs,
                     disliked_genres=stated_dislikes,
+                    remove_favorite_genres=remove_favs,
+                    remove_disliked_genres=remove_dislikes,
+                    clear_all=clear_all,
                     notes=notes
                 )
                 result_data.update(pref_res)

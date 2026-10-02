@@ -43,13 +43,16 @@ Convert the user's message (Vietnamese or English) into a strict JSON object wit
     * "blind_spot": When user asks about blind spots, genres missed, or recommendations from unexplored genres
     * "cohort_opinion": When user asks what peers/similar users think of a specific movie (e.g. Pulp Fiction, Inception)
     * "why_recommendation": When user asks "why would I like that?", "tại sao tôi lại thích phim đó?", asking for grounded reasoning/explanation
-    * "update_taste": When user states, changes, or asks to save their taste, preferences, or movie ratings (e.g. "gu của tôi là...", "lưu lại gu cho tôi", "tôi thích phim hành động", "tôi ghét kinh dị", "tôi vừa xem Inception chấm 5 sao")
+    * "update_taste": When user states, adds, removes, clears, or changes their taste, preferences, or movie ratings (e.g. "gu của tôi là...", "lưu lại gu cho tôi", "thêm sở thích hành động", "xóa sở thích kinh dị", "bỏ ghét hoạt hình", "xóa toàn bộ gu", "reset sở thích", "tôi vừa xem Inception chấm 5 sao")
     * "plot_search": When searching by plot description, theme, or mood keywords
     * "recommend": When user asks for general or tailored movie recommendations
 - "search_query_en": English translation of plot/theme query (string or null)
 - "target_movie": Specific movie title mentioned in query (string or null; only set if an actual movie title is mentioned!)
-- "genres_include": List of genres requested or stated as favorites (e.g. ["Sci-Fi", "Action"] or [])
-- "genres_exclude": List of genres to strictly avoid or stated as disliked (e.g. ["Animation", "Horror"] or [])
+- "genres_include": List of genres requested or stated to ADD to favorites (e.g. ["Sci-Fi", "Action"] or [])
+- "genres_exclude": List of genres to strictly avoid or stated to ADD to dislikes (e.g. ["Animation", "Horror"] or [])
+- "remove_genres_include": List of genres user wants to REMOVE from favorites (e.g. ["Sci-Fi"] when user says "xóa sở thích sci-fi")
+- "remove_genres_exclude": List of genres user wants to REMOVE from dislikes (e.g. ["Horror"] when user says "bỏ ghét kinh dị")
+- "clear_all": Boolean (true if user wants to delete/clear all preferences and reset taste, e.g. "xóa toàn bộ gu", "reset sở thích", "xóa hết gu")
 - "rating": Float number if user is rating a movie (e.g. 5.0, 4.5, 3.0 or null)
 - "time_filter": "longest_unwatched", "least_watched", or null
 - "limit": Integer number of movies requested (default 5; if user asks for 1 movie, set 1)
@@ -195,7 +198,51 @@ class MovieAgent:
         if any(w in word_tokens for w in ["xin", "chào", "hello", "hi", "hey"]) or any(p in q for p in ["bạn là ai", "who are you", "giới thiệu"]):
             return {"intent": "greeting", "limit": limit}
 
-        # Extract genre constraints
+        # Check if user wants to reset or clear all preferences
+        if any(w in q for w in ["xóa hết gu", "xóa toàn bộ gu", "xóa tất cả gu", "reset gu", "reset sở thích", "xóa sở thích của tôi", "clear taste", "xóa hết sở thích"]):
+            return {
+                "intent": "update_taste",
+                "clear_all": True,
+                "limit": 1
+            }
+
+        genre_synonyms = {
+            "Sci-Fi": ["khoa học viễn tưởng", "viễn tưởng", "sci-fi", "scifi"],
+            "Action": ["hành động", "action"],
+            "Comedy": ["hài", "nhẹ nhàng", "comedy", "hài kịch"],
+            "Drama": ["tâm lý", "drama", "chính kịch"],
+            "Horror": ["kinh dị", "horror"],
+            "Animation": ["hoạt hình", "animation", "anime"],
+            "Romance": ["lãng mạn", "romance", "tình cảm"],
+            "Thriller": ["giật gân", "thriller"],
+            "Documentary": ["tài liệu", "documentary"],
+            "Adventure": ["phiêu lưu", "adventure"],
+            "Crime": ["hình sự", "crime", "tội phạm"],
+            "War": ["chiến tranh", "war"],
+            "Western": ["cao bồi", "western"],
+        }
+
+        # Check if user wants to REMOVE preferences
+        is_remove_fav = any(w in q for w in ["xóa sở thích", "bỏ sở thích", "bỏ gu", "xóa gu", "không thích nữa", "bỏ thể loại", "xóa thể loại", "xóa khỏi gu", "bỏ khỏi gu"])
+        is_remove_dislike = any(w in q for w in ["bỏ ghét", "không ghét nữa", "hết ghét", "xóa ghét", "khỏi danh sách ghét", "bỏ tránh"])
+
+        if is_remove_fav or is_remove_dislike:
+            rem_favs = []
+            rem_dislikes = []
+            for canon, syns in genre_synonyms.items():
+                if any(s in q for s in syns):
+                    if is_remove_dislike:
+                        rem_dislikes.append(canon)
+                    elif is_remove_fav:
+                        rem_favs.append(canon)
+            return {
+                "intent": "update_taste",
+                "remove_genres_include": rem_favs if rem_favs else None,
+                "remove_genres_exclude": rem_dislikes if rem_dislikes else None,
+                "limit": 1
+            }
+
+        # Extract genre constraints for normal queries
         genres_exc = []
         if any(w in q for w in ["không phải hoạt hình", "đừng hoạt hình", "không hoạt hình", "chán hoạt hình", "no animation", "đừng phim hoạt hình"]):
             genres_exc.append("Animation")
@@ -213,7 +260,7 @@ class MovieAgent:
             genres_inc.append("Drama")
 
         # Check if user is declaring taste, updating preferences, or adding a rating
-        if any(w in q for w in ["lưu lại", "nhớ nhé", "ghi nhớ", "đổi gu", "gu của tôi", "tôi thích xem", "tôi thích thể loại", "tôi ghét", "sở thích của tôi là", "chấm", "đánh giá", "remember"]):
+        if any(w in q for w in ["thêm sở thích", "thêm gu", "thích thêm", "lưu lại", "nhớ nhé", "ghi nhớ", "đổi gu", "gu của tôi", "tôi thích xem", "tôi thích thể loại", "tôi ghét", "sở thích của tôi là", "chấm", "đánh giá", "remember"]):
             rating_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:sao|star|\★)", q)
             rating_val = float(rating_match.group(1)) if rating_match else None
             target_movie = None
@@ -221,10 +268,21 @@ class MovieAgent:
                 if tm.lower() in q:
                     target_movie = tm
                     break
+            
+            fav_to_add = []
+            dis_to_add = []
+            for canon, syns in genre_synonyms.items():
+                if any(s in q for s in syns):
+                    # Check if specifically mentioned as disliked
+                    if any(pw in q for pw in [f"ghét {s}" for s in syns] + ["tôi ghét", "đừng gợi ý"]):
+                        dis_to_add.append(canon)
+                    else:
+                        fav_to_add.append(canon)
+
             return {
                 "intent": "update_taste",
-                "genres_include": genres_inc if genres_inc else None,
-                "genres_exclude": genres_exc if genres_exc else None,
+                "genres_include": fav_to_add if fav_to_add else (genres_inc if genres_inc else None),
+                "genres_exclude": dis_to_add if dis_to_add else (genres_exc if genres_exc else None),
                 "target_movie": target_movie,
                 "rating": rating_val,
                 "limit": 1
@@ -399,18 +457,32 @@ class MovieAgent:
         # Formatter for dynamic taste preference & rating recording (Assistant Memory)
         if intent == "update_taste":
             res = result.get("result", {})
+            if res.get("status") == "cleared":
+                return f"✅ Đã xóa toàn bộ sở thích và ghi chú cá nhân của bạn (User #{user_id}). Hồ sơ đã được làm mới hoàn toàn!"
+
             favs = ", ".join(res.get("favorite_genres", []))
             dislikes = ", ".join(res.get("disliked_genres", []))
             rating_rec = res.get("rating_record")
-            
-            lines = [f"✅ Đã ghi nhớ cập nhật vào hồ sơ của bạn (User #{user_id}):"]
-            if favs:
-                lines.append(f"• Gu thể loại yêu thích: **{favs}**")
-            if dislikes:
-                lines.append(f"• Thể loại tránh gợi ý: **{dislikes}**")
+            added_f = res.get("added_favorites", [])
+            removed_f = res.get("removed_favorites", [])
+            added_d = res.get("added_dislikes", [])
+            removed_d = res.get("removed_dislikes", [])
+
+            lines = [f"✅ Đã cập nhật hồ sơ sở thích của bạn (User #{user_id}):"]
+            if added_f:
+                lines.append(f"• Thêm vào gu yêu thích: **{', '.join(added_f)}**")
+            if removed_f:
+                lines.append(f"• Xóa khỏi gu yêu thích: **{', '.join(removed_f)}**")
+            if added_d:
+                lines.append(f"• Thêm vào danh sách tránh: **{', '.join(added_d)}**")
+            if removed_d:
+                lines.append(f"• Bỏ khỏi danh sách tránh: **{', '.join(removed_d)}**")
+
+            lines.append(f"• Gu yêu thích hiện tại: **{favs or 'Chưa có'}**")
+            lines.append(f"• Thể loại tránh hiện tại: **{dislikes or 'Không có'}**")
             if rating_rec and "title" in rating_rec:
                 lines.append(f"• Đã lưu đánh giá: **{rating_rec['title']}** - **{rating_rec['rating']}★**")
-            lines.append("Từ bây giờ, tôi sẽ tự động cá nhân hóa mọi gợi ý dựa trên sở thích này của bạn!")
+            lines.append("Mọi gợi ý tiếp theo sẽ được cá nhân hóa chính xác theo danh sách này.")
             return "\n".join(lines)
 
         if intent == "blind_spot":

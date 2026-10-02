@@ -28,10 +28,45 @@ from agent import MovieAgent
 console = Console()
 
 
+AVAILABLE_USERS = [0, 1, 2, 3, 4]
+
+
+def select_user_prompt(engine) -> int:
+    """Display available users (0 to 4) and prompt user to choose one."""
+    console.print()
+    console.rule("[bold cyan]👥 Danh Sách Tài Khoản Người Dùng Khả Dụng (User 0 - 4)[/bold cyan]")
+    table = Table(show_header=True, header_style="bold magenta")
+    table.add_column("User ID", style="bold yellow", width=10, justify="center")
+    table.add_column("Loại Hồ Sơ", style="bold cyan", width=26)
+    table.add_column("Đặc Điểm Gu Phim & Dữ Liệu", style="white")
+
+    descriptions = {
+        0: ("Người dùng mới (Cold-Start)", "0 đánh giá. Chưa có gu ban đầu — Tùy ý thêm, xóa và đổi gu qua chat!"),
+        1: ("Fan Hành Động & Phiêu Lưu", "190 đánh giá (4.33★). Thích: Action, Adventure, Comedy. Điểm mù: IMAX, Documentary."),
+        2: ("Người xem Tâm Lý & Kịch Tính", "15 đánh giá (4.00★). Thích: Drama, Action, Comedy."),
+        3: ("Khán Giả Viễn Tưởng Khắt Khe", "32 đánh giá (2.08★). Thích: Sci-Fi, Action, Thriller."),
+        4: ("Tín Đồ Tâm Lý & Lãng Mạn", "166 đánh giá (3.60★). Thích: Drama, Comedy, Romance."),
+    }
+
+    for uid in AVAILABLE_USERS:
+        title_str, desc_str = descriptions[uid]
+        table.add_row(f"User #{uid}", title_str, desc_str)
+
+    console.print(table)
+    console.print("[dim]Nhập số [0, 1, 2, 3, 4] để vào phòng chat, hoặc gõ trực tiếp --user <id> khi khởi chạy.[/dim]\n")
+
+    while True:
+        choice = Prompt.ask("[bold green]Chọn User ID để bắt đầu[/bold green]", choices=["0", "1", "2", "3", "4"], default="0")
+        try:
+            return int(choice)
+        except ValueError:
+            continue
+
+
 def display_welcome_banner(user_id: int, profile: dict) -> None:
     """Render an attractive user taste card using Rich."""
     console.print()
-    console.rule("[bold cyan]🎬 TrustedAI - Movie Discovery AI Assistant[/bold cyan]")
+    console.rule(f"[bold cyan]🎬 TrustedAI - Movie Discovery AI Assistant | Active: User #{user_id}[/bold cyan]")
     console.print()
 
     # User taste summary table
@@ -40,13 +75,16 @@ def display_welcome_banner(user_id: int, profile: dict) -> None:
     table.add_column("Details", style="cyan")
 
     num_ratings = profile.get("num_ratings", 0)
+    favs = ", ".join([g["genre"] for g in profile.get("top_genres", [])])
+    dislikes = ", ".join(profile.get("disliked_genres", []))
+    notes = profile.get("notes", "")
+
     if num_ratings == 0:
         table.add_row("Ratings Count", "0 (Người dùng mới / Cold-Start)")
         table.add_row("Average Rating", "Chưa có đánh giá")
-        favs = ", ".join([g["genre"] for g in profile.get("top_genres", [])])
-        table.add_row("Gu đã lưu", favs or "Chưa thiết lập (Hãy chat để tôi ghi nhớ!)")
-        table.add_row("Thể loại tránh", ", ".join(profile.get("disliked_genres", [])) or "Không có")
-        table.add_row("Ghi chú cá nhân", profile.get("notes") or "Chưa có")
+        table.add_row("Gu yêu thích đã lưu", favs or "Chưa thiết lập (Hãy chat để thêm!)")
+        table.add_row("Thể loại tránh", dislikes or "Không có")
+        table.add_row("Ghi chú cá nhân", notes or "Chưa có")
     else:
         table.add_row("Ratings Count", str(num_ratings))
         table.add_row("Average Rating", f"{profile.get('avg_rating', 'N/A')} ★")
@@ -56,19 +94,22 @@ def display_welcome_banner(user_id: int, profile: dict) -> None:
         table.add_row("Top Rated Movies", top_movies_str or "None")
         blind_spots_str = ", ".join([b["genre"] for b in profile.get("blind_spots", [])[:3]])
         table.add_row("Blind Spots (Missing)", blind_spots_str or "None")
+        if dislikes:
+            table.add_row("Thể loại tránh (Tự đặt)", dislikes)
 
     console.print(table)
     console.print(
         Panel.fit(
-            "[bold green]Try sample queries:[/bold green]\n"
-            "• [italic]What should I watch tonight?[/italic]\n"
-            "• [italic]Gu của tôi là phim hành động và khoa học viễn tưởng, nhớ nhé[/italic] (Cập nhật gu)\n"
+            "[bold green]Gợi ý tương tác & Quản lý sở thích:[/bold green]\n"
+            "• [italic]Thêm sở thích phim hành động và khoa học viễn tưởng[/italic] (Thêm gu yêu thích)\n"
+            "• [italic]Xóa sở thích khoa học viễn tưởng[/italic] (Xóa gu khỏi danh sách thích)\n"
+            "• [italic]Tôi ghét phim kinh dị[/italic] (Thêm thể loại tránh gợi ý)\n"
+            "• [italic]Bỏ ghét phim kinh dị[/italic] (Xóa khỏi danh sách tránh)\n"
+            "• [italic]Xóa toàn bộ gu / Reset sở thích[/italic] (Xóa hết gu đã lưu để làm lại)\n"
             "• [italic]Tôi vừa xem Inception và chấm 5 sao[/italic] (Lưu đánh giá mới)\n"
-            "• [italic]What do people with similar taste to mine think about Pulp Fiction?[/italic]\n"
-            "• [italic]I liked Toy Story but I'm tired of animated movies — what else?[/italic]\n"
-            "• [italic]Why do you think I'd like Inception?[/italic] (Grounded explainability)\n"
-            "• [yellow]exit[/yellow] or [yellow]quit[/yellow] to end session.",
-            title="💡 Quick Tips",
+            "• [italic]Tối nay xem gì hợp gu tôi?[/italic] | [italic]Why do you think I'd like Inception?[/italic]\n"
+            "• Lệnh nhanh: [yellow]/switch <0-4>[/yellow] (Đổi user), [yellow]/profile[/yellow] (Xem lại gu), [yellow]exit[/yellow] (Thoát).",
+            title="💡 Hướng Dẫn & Lệnh Nhanh",
             border_style="blue"
         )
     )
@@ -77,37 +118,67 @@ def display_welcome_banner(user_id: int, profile: dict) -> None:
 
 def run_interactive_cli(user_id: int, agent: MovieAgent) -> None:
     """Run interactive REPL loop."""
-    profile = agent.engine.get_user_profile(user_id)
-    display_welcome_banner(user_id, profile)
+    current_uid = user_id
+    profile = agent.engine.get_user_profile(current_uid)
+    display_welcome_banner(current_uid, profile)
 
     history: list[dict] = []
 
     while True:
         try:
-            user_input = Prompt.ask(f"[bold yellow]User #{user_id}[/bold yellow]")
+            user_input = Prompt.ask(f"[bold yellow]User #{current_uid}[/bold yellow]")
             if not user_input or not user_input.strip():
                 continue
 
             clean_input = user_input.strip()
-            if clean_input.lower() in ("exit", "quit", "q"):
+            lower_input = clean_input.lower()
+
+            if lower_input in ("exit", "quit", "q"):
                 console.print("[cyan]Goodbye! Happy movie watching! 🍿[/cyan]")
                 break
 
+            # Handle shortcut slash commands
+            if lower_input.startswith("/switch ") or lower_input.startswith("/user "):
+                parts = clean_input.split()
+                if len(parts) >= 2 and parts[1].isdigit():
+                    new_uid = int(parts[1])
+                    if new_uid in AVAILABLE_USERS:
+                        current_uid = new_uid
+                        history.clear()
+                        console.print(f"[bold green]Đã chuyển sang tài khoản User #{current_uid}![/bold green]")
+                        profile = agent.engine.get_user_profile(current_uid)
+                        display_welcome_banner(current_uid, profile)
+                        continue
+                    else:
+                        console.print(f"[bold red]Chỉ hỗ trợ User từ 0 đến 4! Hãy chọn một trong: {AVAILABLE_USERS}[/bold red]")
+                        continue
+
+            if lower_input in ("/profile", "/p", "/me"):
+                profile = agent.engine.get_user_profile(current_uid)
+                display_welcome_banner(current_uid, profile)
+                continue
+
+            if lower_input in ("/users", "/list"):
+                select_user_prompt(agent.engine)
+                continue
+
             with console.status("[bold cyan]AI Agent is investigating the dataset...[/bold cyan]", spinner="dots"):
-                res = agent.chat(user_id=user_id, user_message=clean_input, history=history)
+                res = agent.chat(user_id=current_uid, user_message=clean_input, history=history)
 
             # Show parsed intent and execution trace
             parsed = res.get("parsed_params", {})
             if parsed:
                 inc_str = f", inc={parsed.get('genres_include')}" if parsed.get('genres_include') else ""
                 exc_str = f", exc={parsed.get('genres_exclude')}" if parsed.get('genres_exclude') else ""
+                rem_inc_str = f", rem_inc={parsed.get('remove_genres_include')}" if parsed.get('remove_genres_include') else ""
+                rem_exc_str = f", rem_exc={parsed.get('remove_genres_exclude')}" if parsed.get('remove_genres_exclude') else ""
                 lim_str = f", limit={parsed.get('limit')}" if parsed.get('limit') else ""
-                console.print(f"[dim]🎯 Intent: {parsed.get('intent')}{inc_str}{exc_str}{lim_str} | Brain: {res.get('model_used')}[/dim]")
+                console.print(f"[dim]🎯 Intent: {parsed.get('intent')}{inc_str}{exc_str}{rem_inc_str}{rem_exc_str}{lim_str} | Brain: {res.get('model_used')}[/dim]")
 
             # Render answer
             answer_text = res.get("answer", "")
             console.print()
-            console.print(Panel(Markdown(answer_text), title="🤖 AI Assistant", border_style="cyan"))
+            console.print(Panel(Markdown(answer_text), title=f"🤖 AI Assistant (for User #{current_uid})", border_style="cyan"))
             console.print()
 
             # Record turn in short memory
@@ -170,8 +241,8 @@ def run_evaluation_suite(agent: MovieAgent, output_file: str = "benchmark_evalua
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="TrustedAI Movie Discovery Assistant")
-    parser.add_argument("--user", type=int, default=1, help="User ID (e.g. 1, 15, 30)")
+    parser = argparse.ArgumentParser(description="TrustedAI Movie Discovery Assistant (Users 0 - 4)")
+    parser.add_argument("--user", type=int, choices=AVAILABLE_USERS, default=None, help="User ID (0: New User, 1: Action/Adventure, 2: Drama/Action, 3: Sci-Fi, 4: Romance)")
     parser.add_argument("--eval", action="store_true", help="Run automated evaluation benchmark and exit")
     args = parser.parse_args()
 
@@ -180,7 +251,8 @@ def main() -> None:
     if args.eval:
         run_evaluation_suite(agent)
     else:
-        run_interactive_cli(user_id=args.user, agent=agent)
+        user_id = args.user if args.user is not None else select_user_prompt(agent.engine)
+        run_interactive_cli(user_id=user_id, agent=agent)
 
 
 if __name__ == "__main__":

@@ -56,8 +56,8 @@ Unlike standard search engines or generic LLM chatbots that hallucinate movie fa
 ### 1. Prerequisites
 Ensure Python 3.10 or higher is installed:
 ```bash
-git clone <your-github-repo-url>
-cd "bài test"
+git clone https://github.com/tunglamhe180046/movie-discovery-ai-assistant.git
+cd movie-discovery-ai-assistant
 python -m venv venv
 # Windows:
 .\venv\Scripts\activate

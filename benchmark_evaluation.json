@@ -1,0 +1,112 @@
+[
+  {
+    "test_id": 1,
+    "user_id": 1,
+    "query": "Cho tôi 1 tên phim lâu rồi tôi chưa xem hoặc xem ít nhất.",
+    "tools_called": [
+      "oldest_or_underwatched"
+    ],
+    "answer": "Dựa trên dòng thời gian (timestamp) lịch sử đánh giá của bạn, đây là bộ phim bạn đã xem và đánh giá **từ lâu nhất trong quá khứ**:\n\n🎬 **Star Wars: Episode VI - Return of the Jedi** (1983)\n- **Thể loại:** Action|Adventure|Sci-Fi\n- **Điểm bạn đã chấm:** **5.0★ / 5.0**\n- **Thời điểm bạn đánh giá:** Ngày **31/07/2000** (cách đây 26 năm)\n\nĐây là một tác phẩm bạn từng rất yêu thích nhưng có thể đã lâu rồi bạn chưa xem lại!",
+    "model_used": "qwen/qwen3.8-27b"
+  },
+  {
+    "test_id": 2,
+    "user_id": 1,
+    "query": "Tìm một phim khoa học viễn tưởng tôi chưa xem trong 2 năm, đừng kinh dị.",
+    "tools_called": [
+      "recommend"
+    ],
+    "answer": "Dựa trên lịch sử 190 phim của bạn (gu chính: **Action, Adventure, Comedy**, rating TB: 4.33★) (đã loại trừ: Horror), đây là các gợi ý phù hợp nhất:\n\n1. **Star Wars: Episode VI - Return of the Jedi** (Action|Adventure|Sci-Fi) - Match Score: None",
+    "model_used": "qwen/qwen3.8-27b"
+  },
+  {
+    "test_id": 3,
+    "user_id": 1,
+    "query": "Tối nay xem gì nhẹ nhàng, không phải hoạt hình?",
+    "tools_called": [
+      "recommend"
+    ],
+    "answer": "Dựa trên lịch sử 190 phim của bạn (gu chính: **Action, Adventure, Comedy**, rating TB: 4.33★) (đã loại trừ: Animation), đây là các gợi ý phù hợp nhất:\n\n1. **Antonia's Line (Antonia)** (Comedy|Drama) - Match Score: 0.8859\n2. **Anne Frank Remembered** (Documentary) - Match Score: 0.8839\n3. **Robin Hood: Prince of Thieves** (Adventure|Drama) - Match Score: 0.8607\n4. **Phenomenon** (Drama|Romance) - Match Score: 0.8093\n5. **Patriot Games** (Action|Crime|Drama|Thriller) - Match Score: 0.7829",
+    "model_used": "qwen/qwen3.8-27b"
+  },
+  {
+    "test_id": 4,
+    "user_id": 1,
+    "query": "Trong các phim giống Inception, phim nào tôi đã xem lâu nhất?",
+    "tools_called": [
+      "oldest_or_underwatched"
+    ],
+    "answer": "Dựa trên dòng thời gian (timestamp) lịch sử đánh giá của bạn, đây là bộ phim bạn đã xem và đánh giá **từ lâu nhất trong quá khứ**:\n\n🎬 **Star Wars: Episode VI - Return of the Jedi** (1983)\n- **Thể loại:** Action|Adventure|Sci-Fi\n- **Điểm bạn đã chấm:** **5.0★ / 5.0**\n- **Thời điểm bạn đánh giá:** Ngày **31/07/2000** (cách đây 26 năm)\n\nĐây là một tác phẩm bạn từng rất yêu thích nhưng có thể đã lâu rồi bạn chưa xem lại!",
+    "model_used": "qwen/qwen3.8-27b"
+  },
+  {
+    "test_id": 5,
+    "user_id": 1,
+    "query": "Đừng gợi ý bất cứ phim hoạt hình nào; chọn phim hành động tôi bỏ quên.",
+    "tools_called": [
+      "recommend"
+    ],
+    "answer": "Dựa trên lịch sử 190 phim của bạn (gu chính: **Action, Adventure, Comedy**, rating TB: 4.33★) (đã loại trừ: Animation), đây là các gợi ý phù hợp nhất:\n\n1. **Star Wars: Episode VI - Return of the Jedi** (Action|Adventure|Sci-Fi) - Match Score: None\n2. **She's the One** (Comedy|Romance) - Match Score: None\n3. **Bambi** (Animation|Children|Drama) - Match Score: None\n4. **Gladiator** (Action|Adventure|Drama) - Match Score: None\n5. **Road Trip** (Comedy) - Match Score: None",
+    "model_used": "qwen/qwen3.8-27b"
+  },
+  {
+    "test_id": 6,
+    "user_id": 1,
+    "query": "Có phim nào thuộc thể loại điểm mù mà tôi gần như chưa xem nhưng hợp với tôi không?",
+    "tools_called": [
+      "blind_spot"
+    ],
+    "answer": "### 🎬 Phân tích 'Điểm mù' (Thể loại bạn ít hoặc chưa từng khám phá):\n\n- **IMAX**: Bạn mới xem/chấm **0** phim (trong khi cộng đồng đã đánh giá 2,524 lần).\n- **Western**: Bạn mới xem/chấm **7** phim (trong khi cộng đồng đã đánh giá 1,638 lần).\n- **Film-Noir**: Bạn mới xem/chấm **1** phim (trong khi cộng đồng đã đánh giá 797 lần).\n\n**Gợi ý các bộ phim đỉnh nhất thuộc các thể loại điểm mù trên để bạn mở rộng gu xem:**\n\n1. **Paris Is Burning** (Documentary)\n   - Thể loại điểm mù: **Documentary**\n   - Đánh giá cộng đồng: **4.5★** (5 lượt đánh giá)\n2. **Sunset Blvd. (a.k.a. Sunset Boulevard)** (Drama|Film-Noir|Romance)\n   - Thể loại điểm mù: **Film-Noir**\n   - Đánh giá cộng đồng: **4.33★** (27 lượt đánh giá)\n3. **Laura** (Crime|Film-Noir|Mystery)\n   - Thể loại điểm mù: **Film-Noir**\n   - Đánh giá cộng đồng: **4.33★** (6 lượt đánh giá)\n4. **Double Indemnity** (Crime|Drama|Film-Noir)\n   - Thể loại điểm mù: **Film-Noir**\n   - Đánh giá cộng đồng: **4.32★** (17 lượt đánh giá)\n5. **Near Dark** (Horror|Western)\n   - Thể loại điểm mù: **Western**\n   - Đánh giá cộng đồng: **4.31★** (8 lượt đánh giá)",
+    "model_used": "qwen/qwen3.8-27b"
+  },
+  {
+    "test_id": 7,
+    "user_id": 1,
+    "query": "Những người có gu giống tôi nghĩ gì về Pulp Fiction?",
+    "tools_called": [
+      "cohort_opinion"
+    ],
+    "answer": "Dựa trên dữ liệu thực tế, đây là ý kiến của nhóm người có gu tương đồng nhất với bạn về **Pulp Fiction**:\n\n- **Số người cùng gu được rà soát:** 20 người\n- **Số người trong nhóm đã xem:** 2 người\n- **Điểm đánh giá trung bình từ nhóm cùng gu:** **1.75 / 5.0★**\n- **Chi tiết chấm điểm:** User 210: 0.5★, User 476: 3.0★\n\n⚠️ **Nhận xét trung thực:** Mặc dù bộ phim này có thể nổi tiếng với đại chúng, nhưng những người có gu xem phim giống bạn lại **không đánh giá cao**. Bạn nên cân nhắc kỹ trước khi xem!",
+    "model_used": "qwen/qwen3.8-27b"
+  },
+  {
+    "test_id": 8,
+    "user_id": 1,
+    "query": "Điểm mù của tôi là gì và cho tôi phim tiêu biểu để bắt đầu?",
+    "tools_called": [
+      "blind_spot"
+    ],
+    "answer": "### 🎬 Phân tích 'Điểm mù' (Thể loại bạn ít hoặc chưa từng khám phá):\n\n- **IMAX**: Bạn mới xem/chấm **0** phim (trong khi cộng đồng đã đánh giá 2,524 lần).\n- **Western**: Bạn mới xem/chấm **7** phim (trong khi cộng đồng đã đánh giá 1,638 lần).\n- **Film-Noir**: Bạn mới xem/chấm **1** phim (trong khi cộng đồng đã đánh giá 797 lần).\n\n**Gợi ý các bộ phim đỉnh nhất thuộc các thể loại điểm mù trên để bạn mở rộng gu xem:**\n\n1. **Paris Is Burning** (Documentary)\n   - Thể loại điểm mù: **Documentary**\n   - Đánh giá cộng đồng: **4.5★** (5 lượt đánh giá)\n2. **Sunset Blvd. (a.k.a. Sunset Boulevard)** (Drama|Film-Noir|Romance)\n   - Thể loại điểm mù: **Film-Noir**\n   - Đánh giá cộng đồng: **4.33★** (27 lượt đánh giá)\n3. **Laura** (Crime|Film-Noir|Mystery)\n   - Thể loại điểm mù: **Film-Noir**\n   - Đánh giá cộng đồng: **4.33★** (6 lượt đánh giá)\n4. **Double Indemnity** (Crime|Drama|Film-Noir)\n   - Thể loại điểm mù: **Film-Noir**\n   - Đánh giá cộng đồng: **4.32★** (17 lượt đánh giá)\n5. **Near Dark** (Horror|Western)\n   - Thể loại điểm mù: **Western**\n   - Đánh giá cộng đồng: **4.31★** (8 lượt đánh giá)",
+    "model_used": "qwen/qwen3.8-27b"
+  },
+  {
+    "test_id": 9,
+    "user_id": 1,
+    "query": "Gợi ý cho tôi 1 phim tâm lý đen tối có plot twist bất ngờ.",
+    "tools_called": [
+      "recommend"
+    ],
+    "answer": "Dựa trên lịch sử 190 phim của bạn (gu chính: **Action, Adventure, Comedy**, rating TB: 4.33★), đây là các gợi ý phù hợp nhất:\n\n1. **Robin Hood: Prince of Thieves** (Adventure|Drama) - Match Score: 0.6",
+    "model_used": "qwen/qwen3.8-27b"
+  },
+  {
+    "test_id": 10,
+    "user_id": 15,
+    "query": "What should I watch tonight?",
+    "tools_called": [
+      "recommend"
+    ],
+    "answer": "Dựa trên lịch sử 85 phim của bạn (gu chính: **Drama, Sci-Fi, Adventure**, rating TB: 3.55★), đây là các gợi ý phù hợp nhất:\n\n1. **Antonia's Line (Antonia)** (Comedy|Drama) - Match Score: 0.8715\n2. **Anne Frank Remembered** (Documentary) - Match Score: 0.8701\n3. **Godfather: Part II, The** (Crime|Drama) - Match Score: 0.8234\n4. **Shine** (Drama|Romance) - Match Score: 0.7626\n5. **Phenomenon** (Drama|Romance) - Match Score: 0.7605",
+    "model_used": "qwen/qwen3.8-27b"
+  },
+  {
+    "test_id": 11,
+    "user_id": 30,
+    "query": "What should I watch tonight?",
+    "tools_called": [
+      "recommend"
+    ],
+    "answer": "Dựa trên lịch sử 18 phim của bạn (gu chính: **Action, Adventure, Sci-Fi**, rating TB: 4.61★), đây là các gợi ý phù hợp nhất:\n\n1. **Cool Hand Luke** (Drama) - Match Score: 0.6634\n2. **Inside Man** (Crime|Drama|Thriller) - Match Score: 0.6492\n3. **Wallace & Gromit: The Wrong Trousers** (Animation|Children|Comedy|Crime) - Match Score: 0.6466\n4. **Serenity** (Action|Adventure|Sci-Fi) - Match Score: 0.6156\n5. **Great Escape, The** (Action|Adventure|Drama|War) - Match Score: 0.6049",
+    "model_used": "qwen/qwen3.8-27b"
+  }
+]

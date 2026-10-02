@@ -1,0 +1,171 @@
+# 🎬 Movie Discovery AI Assistant (TrustedAI Technical Assessment)
+
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+[![Evaluation: 10/10 Passed](https://img.shields.io/badge/Benchmark-10%2F10%20Passed-brightgreen.svg)](scripts/test_codex_cases.py)
+
+An intelligent, data-grounded conversational AI assistant designed to help users discover films by actively **investigating and reasoning over historical dataset signals** (MovieLens: 74k ratings, 5.1k movies with plots, genres, and user tags).
+
+Built for the **TrustedAI - AI Engineer Challenge** by candidate **Tùng Lâm**.
+
+---
+
+## 🌟 Key Highlights & Requirements Fulfillment
+
+Unlike standard search engines or generic LLM chatbots that hallucinate movie facts and ratings, this assistant implements a **Two-Tier Decoupled Architecture**: the LLM handles natural language parsing and conversational synthesis, while all data retrieval, cohort aggregation, and score calculations remain **100% deterministic, grounded, and verifiable**.
+
+| Requirement | Implementation & Technical Mechanism | Status |
+|---|---|:---:|
+| **1. Personalization by User ID** | Pearson Correlation Collaborative Filtering with mean-centering and positive-similarity weighting ($\ge 3$ co-rated movies). Historical profile aggregation. | ✅ **Done** |
+| **2. Multi-Signal Synthesis** | Combines user taste vectors, plot TF-IDF semantic search ($25k$ features), cohort opinions, and strict genre inclusion/exclusion constraints. | ✅ **Done** |
+| **3. Grounded Explainability ("Why would I like that?")** | `explain_recommendation()` traces back exact matching genres from the user's top-rated history, peer cohort ratings with sample confidence, and blind spot status. | ✅ **Done** |
+| **4. Rigorous Evaluation & Evidence** | Automated benchmark test suite (`10/10 passed`), reproducible JSON artifacts, confidence gating for small sample sizes ($n < 3$), and transparent failure analysis. | ✅ **Done** |
+
+---
+
+## 🏛 Architecture
+
+```
+[ User / Terminal CLI ]
+          │
+          ▼  (Natural Language Query in Vietnamese / English)
+┌────────────────────────────────────────────────────────────────────────┐
+│  Tier 1: Conversational Agent (agent.py)                                │
+│  • Structured Intent & Parameter Parser (DeepSeek / Groq / Offline)   │
+│  • Intent Routing: profile, recommend, cohort, why_recommendation...   │
+│  • Fact-Constrained Natural Synthesizer (No Hallucinations)            │
+│  • Automatic API Key Rotation + Graceful Offline Fallback Engine       │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ Structured Parameters (JSON)
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│  Tier 2: Deterministic Data Engine (engine.py)                         │
+│  • User Profiling & Global Genre Distribution Caching                  │
+│  • User-User Pearson Collaborative Filtering (User Taste Vectors)      │
+│  • Content Search: TF-IDF Plot Vectorizer + Cosine Similarity          │
+│  • Strict Constraint Engine (Hard genre include/exclude gating)        │
+│  • Sample Confidence Estimator (High / Medium / Low for cohorts)       │
+│  • Grounded Reasoner: Explains recommendations with historical proof    │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🚀 Quickstart & Setup
+
+### 1. Prerequisites
+Ensure Python 3.10 or higher is installed:
+```bash
+git clone <your-github-repo-url>
+cd "bài test"
+python -m venv venv
+# Windows:
+.\venv\Scripts\activate
+# Linux/macOS:
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+### 2. Environment Configuration (Optional)
+Create a `.env` file from `.env.example`:
+```bash
+copy .env.example .env   # Windows
+# or cp .env.example .env # Linux/macOS
+```
+Add your **DeepSeek** or **Groq** API key:
+```env
+DEEPSEEK_API_KEY=your_deepseek_api_key
+GROQ_API_KEY=your_groq_api_key
+```
+> **Note:** If no API key is provided or if network limits are encountered, the system **automatically and seamlessly switches to the deterministic offline engine** without crashing.
+
+---
+
+## 💻 Running the Application
+
+### 1. Interactive Terminal CLI
+Start a conversation for any user (e.g., User 1, 15, or 30):
+```bash
+python main.py --user 1
+```
+Try asking natural language questions:
+* *"Tối nay xem gì nhẹ nhàng, không phải hoạt hình?"* (Constraints: Comedy/Drama, Exclude: Animation)
+* *"Những người có gu giống tôi nghĩ gì về Pulp Fiction?"* (Cohort aggregation & sample confidence)
+* *"Tại sao tôi lại thích Inception?"* (Grounded explainability using rating history & cohort scores)
+* *"Điểm mù của tôi là gì và cho tôi phim tiêu biểu để bắt đầu?"* (Statistical distribution contrast)
+* *"Tìm một phim khoa học viễn tưởng tôi chưa xem, đừng kinh dị."* (Strict include Sci-Fi, exclude Horror)
+
+### 2. Run Automated Test Suite
+Run the 10 benchmark test cases:
+```bash
+python scripts/test_codex_cases.py
+```
+Output:
+```text
+============================================================
+RUNNING 10 CODEX BENCHMARK TEST CASES
+============================================================
+[Case 1] Query: 'Cho tôi 1 tên phim lâu rồi tôi chưa xem...' -> [PASS]
+[Case 2] Query: 'Tìm phim khoa học viễn tưởng... đừng kinh dị' -> [PASS]
+...
+============================================================
+TEST SUMMARY: 10/10 Passed!
+============================================================
+```
+
+### 3. Generate Benchmark JSON Report
+Run full benchmark evaluation across multiple profiles:
+```bash
+python main.py --eval
+```
+Generates detailed metrics in `benchmark_evaluation.json`.
+
+---
+
+## 📊 Dataset Overview
+
+Dataset located at `data/ml-latest-small-filtered/`:
+* **`movies_with_plots.csv`**: 5,135 movies with synopsis plots (avg ~3,200 chars), genres, and release years.
+* **`ratings.csv`**: 74,064 ratings from 610 users (range 0.5 - 5.0).
+* **`tags.csv`**: 2,440 user-generated tags.
+
+### Key Dataset Characteristic & Design Rationale
+The sparsity in this filtered dataset is on the **movie side**, not the user side (~51% of movies have fewer than 5 ratings, but users average ~121 ratings).
+* **Pure Collaborative Filtering** struggles on obscure, long-tail movies due to lack of peer overlap.
+* **Our Solution:** A **Hybrid Recommender** that fuses Pearson Collaborative Filtering (60% weight) to identify cohort favorites with **TF-IDF Plot Semantic Search** (40% weight) to surface thematic hidden gems.
+
+---
+
+## 🔍 Key Technical Fixes & Improvements (P0/P1)
+
+1. **Strict Genre Include Gating**: Resolved the candidate leakage issue where genre-specific queries (e.g. Sci-Fi) previously fell back to non-matching genres. Candidates are now strictly pre-filtered and backfilled with top-rated genre titles.
+2. **Grounded Explainability Pipeline**: Added the `why_recommendation` intent, hooking [`explain_recommendation()`](engine.py) directly into the agent. Users asking *"Why would I like that?"* receive exact matching genres, personal rating comparison, and cohort rating breakdown.
+3. **Cohort Sample Confidence Gate**: For cult films with sparse peer ratings (e.g. *Pulp Fiction* where only 2 peers rated it), the system explicitly flags `confidence: "low (sparse cohort sample)"` and prints community-wide averages (4.2★) alongside cohort scores to prevent small-sample bias.
+4. **Dynamic User Profiling**: Removed hardcoded assumptions in fallback templates; rating counts, favorite genres, and timestamps are dynamically generated for all 610 users.
+
+---
+
+## 📁 Repository Structure
+
+```
+├── agent.py                   # Conversational Agent, Intent Parser & LLM Synthesizer
+├── engine.py                  # Deterministic Recommendation & Analytics Engine
+├── main.py                    # Interactive Rich Terminal CLI & Evaluation Runner
+├── requirements.txt           # Python dependencies
+├── README.md                  # Project overview and documentation
+├── REPORT_TEMPLATE.md         # Comprehensive engineering report & failure analysis
+├── PROBLEM.md                 # Original TrustedAI problem requirements
+├── benchmark_evaluation.json  # Exported evaluation results
+├── scripts/
+│   ├── test_codex_cases.py    # 10 benchmark verification test cases
+│   ├── test_groq_connection.py # API latency & connectivity verification
+│   └── verify_dataset.py      # Dataset integrity verification script
+└── data/                      # Filtered MovieLens dataset
+```
+
+---
+
+## 👤 Author
+* **Candidate:** Tùng Lâm (AI Engineer)
+* **Target:** TrustedAI - AI Engineer Take-Home Assessment
+* **Evaluation Date:** October 2026

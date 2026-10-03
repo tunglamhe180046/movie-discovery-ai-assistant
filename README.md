@@ -157,8 +157,21 @@ python main.py --user 0
 * *"What's my blind spot? What genres am I missing?"* (Statistical distribution contrast)
 * *"Find me a sci-fi movie I haven't watched, no horror."* (Strict include Sci-Fi, exclude Horror)
 
-### 2. Run Automated Test Suite
-Run the 10 benchmark test cases:
+### 2. Run Automated Test Suites
+
+#### A. Domain Guardrail & Security Suite (Codex Designed)
+Verify the Two-Tier Domain Guardrails (strict cinema scope, active gatekeeper hallucination override, courtroom/law movie nuance, mixed-query bypass prevention):
+```bash
+python scripts/test_domain_guardrails.py
+```
+Output:
+```text
+Ran 6 tests in 0.002s
+OK
+```
+
+#### B. Benchmark Regression Suite
+Run the 10 core benchmark assessment cases:
 ```bash
 python scripts/test_codex_cases.py
 ```

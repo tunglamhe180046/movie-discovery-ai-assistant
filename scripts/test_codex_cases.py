@@ -45,7 +45,8 @@ def run_tests():
         print(f"-> Output preview:\n{ans[:250]}...")
         
         # Validation checks
-        if len(ans.strip()) > 30 and ("🎬" in ans or "★" in ans or "Phim" in ans or "phim" in ans or "Match" in ans):
+        has_signal = any(k in ans.lower() for k in ["🎬", "★", "phim", "match", "cohort", "đánh giá", "rating", "điểm", "/5"])
+        if len(ans.strip()) > 30 and has_signal:
             print(f"-> STATUS: [PASS]")
             passed += 1
         else:

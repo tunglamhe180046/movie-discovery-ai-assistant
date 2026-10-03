@@ -15,6 +15,8 @@ import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
+from codex_systems_core import CodexFuzzyEntityResolver, CodexAtomicMemoryJournal
+
 DEFAULT_DATA_DIR = Path(__file__).resolve().parent / "data" / "ml-latest-small-filtered"
 POPULAR_GENRE_MIN_COUNT = 20
 
@@ -88,6 +90,9 @@ class MovieDataEngine:
         self._build_user_item_matrix()
         self._build_tfidf_index()
 
+        # Initialize Codex high-performance fuzzy entity resolver
+        self.entity_resolver = CodexFuzzyEntityResolver(movies_df=self.movies)
+
     def _canonicalize_genre(self, g: str) -> str:
         """Standardize raw or colloquial genre names to canonical MovieLens casing."""
         if not g:
@@ -106,31 +111,12 @@ class MovieDataEngine:
         return [str(g) for g in counts.head(top_n).index if g]
 
     def _load_user_memory(self) -> dict[str, dict]:
-        """Load persistent working memory from disk safely."""
-        if self.user_memory_path.exists():
-            try:
-                with open(self.user_memory_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    if isinstance(data, dict):
-                        return data
-            except Exception:
-                return {}
-        return {}
+        """Load persistent working memory from disk safely using Codex journal."""
+        return CodexAtomicMemoryJournal.safe_load(self.user_memory_path)
 
     def _save_user_memory(self) -> None:
-        """Persist working memory to disk atomically to prevent empty 0-byte file corruption."""
-        try:
-            self.user_memory_path.parent.mkdir(parents=True, exist_ok=True)
-            temp_path = self.user_memory_path.with_suffix(".tmp")
-            with open(temp_path, "w", encoding="utf-8") as f:
-                json.dump(self.user_memory, f, ensure_ascii=False, indent=2)
-            temp_path.replace(self.user_memory_path)
-        except Exception:
-            try:
-                with open(self.user_memory_path, "w", encoding="utf-8") as f:
-                    json.dump(self.user_memory, f, ensure_ascii=False, indent=2)
-            except Exception:
-                pass
+        """Persist working memory to disk atomically using Codex journal."""
+        CodexAtomicMemoryJournal.atomic_save(self.user_memory_path, self.user_memory)
 
     def _inject_custom_memory_ratings(self) -> None:
         """Inject user ratings saved in memory into the active ratings DataFrame without duplicates."""
@@ -296,6 +282,13 @@ class MovieDataEngine:
             "genres": movie_row["genres"],
             "timestamp": int(pd.Timestamp.now().timestamp())
         })
+
+        # Also sync rating into movie_reviews if this movie has an existing review
+        if "movie_reviews" in self.user_memory[uid_str]:
+            for rev in self.user_memory[uid_str]["movie_reviews"]:
+                if rev.get("movieId") == int(movie_id):
+                    rev["rating"] = rating_val
+
         self._save_user_memory()
 
         # Append to live self.ratings DataFrame & re-pivot
@@ -315,6 +308,101 @@ class MovieDataEngine:
             "rating": rating_val,
             "status": "rating_saved"
         }
+
+    def record_user_movie_review(
+        self,
+        user_id: int,
+        movie_title_or_id: str | int,
+        feeling: str,
+        sentiment: str = "neutral",
+        rating: float | None = None
+    ) -> dict:
+        """Record qualitative feelings/reactions for a movie in persistent episodic memory."""
+        movie_id = self._resolve_movie_id(movie_title_or_id)
+        if movie_id is None:
+            return {
+                "status": "movie_not_found",
+                "query": str(movie_title_or_id),
+                "message": f"Không tìm thấy phim '{movie_title_or_id}' trong cơ sở dữ liệu."
+            }
+
+        movie_row = self._get_movie_row(movie_id)
+        uid_str = str(user_id)
+        if uid_str not in self.user_memory:
+            self.user_memory[uid_str] = {
+                "favorite_genres": [],
+                "disliked_genres": [],
+                "custom_ratings": [],
+                "movie_reviews": [],
+                "has_explicit_preference": False,
+                "notes": ""
+            }
+
+        if "movie_reviews" not in self.user_memory[uid_str]:
+            self.user_memory[uid_str]["movie_reviews"] = []
+
+        # Update existing review for this movie or append new one
+        existing = None
+        for r in self.user_memory[uid_str]["movie_reviews"]:
+            if r.get("movieId") == movie_id:
+                existing = r
+                break
+
+        now_ts = int(pd.Timestamp.now().timestamp())
+        now_date = pd.Timestamp.now().strftime("%d/%m/%Y")
+
+        if existing:
+            existing["user_feeling"] = feeling
+            existing["sentiment"] = sentiment
+            if rating is not None:
+                existing["rating"] = float(rating)
+            existing["updated_at"] = now_ts
+            existing["date_str"] = now_date
+        else:
+            self.user_memory[uid_str]["movie_reviews"].append({
+                "movieId": int(movie_id),
+                "title": movie_row["title"],
+                "user_feeling": feeling,
+                "sentiment": sentiment,
+                "rating": float(rating) if rating is not None else None,
+                "created_at": now_ts,
+                "date_str": now_date
+            })
+
+        # If user also specified a numeric rating, synchronize with ratings matrix
+        if rating is not None:
+            self.add_user_rating(user_id, movie_id, float(rating))
+        else:
+            self._save_user_memory()
+
+        return {
+            "status": "review_saved",
+            "user_id": user_id,
+            "movieId": int(movie_id),
+            "title": movie_row["title"],
+            "user_feeling": feeling,
+            "sentiment": sentiment,
+            "rating": rating,
+            "date_str": now_date
+        }
+
+    def get_user_movie_review(self, user_id: int, movie_title_or_id: str | int) -> dict | None:
+        """Retrieve user's previous personal feelings/review for a specific movie if present."""
+        movie_id = self._resolve_movie_id(movie_title_or_id)
+        if movie_id is None:
+            return None
+
+        uid_str = str(user_id)
+        reviews = self.user_memory.get(uid_str, {}).get("movie_reviews", [])
+        for r in reviews:
+            if r.get("movieId") == movie_id:
+                return r
+        return None
+
+    def get_all_user_movie_reviews(self, user_id: int) -> list[dict]:
+        """Get all qualitative movie feelings recorded by this user."""
+        uid_str = str(user_id)
+        return list(self.user_memory.get(uid_str, {}).get("movie_reviews", []))
 
     def _build_user_item_matrix(self) -> None:
         self._user_item_matrix = self.ratings.pivot_table(
@@ -372,6 +460,12 @@ class MovieDataEngine:
             notable = matches.merge(self.movie_stats[["movieId", "rating_count"]], on="movieId")
             notable = notable.sort_values("rating_count", ascending=False)
             return int(notable.iloc[0]["movieId"])
+
+        # 4. Codex High-Performance Fuzzy & Bilingual Alias Resolver
+        if hasattr(self, "entity_resolver"):
+            mid, _, conf = self.entity_resolver.resolve_title(query_str, threshold=0.72)
+            if mid is not None and conf >= 0.72:
+                return int(mid)
 
         return None
 
@@ -454,6 +548,7 @@ class MovieDataEngine:
         blind_spots = blind_spots[:5]
 
         notes = custom_mem.get("notes", "")
+        movie_reviews = custom_mem.get("movie_reviews", [])
         return {
             "user_id": user_id,
             "num_ratings": num_ratings,
@@ -462,8 +557,9 @@ class MovieDataEngine:
             "disliked_genres": custom_dislikes,
             "top_movies": top_movies,
             "blind_spots": blind_spots,
-            "has_custom_profile": bool(has_explicit or custom_favs or custom_dislikes or notes),
+            "has_custom_profile": bool(has_explicit or custom_favs or custom_dislikes or notes or movie_reviews),
             "notes": notes,
+            "movie_reviews": movie_reviews,
         }
 
     # ------------------------------------------------------------------
@@ -915,6 +1011,7 @@ class MovieDataEngine:
         target_movie = params.get("target_movie")
         search_query = params.get("search_query_en")
         time_filter = params.get("time_filter")
+        user_past_review = self.get_user_movie_review(user_id, target_movie) if target_movie else None
         # 0. Greeting / identity inquiry
         if intent == "greeting":
             return {
@@ -965,11 +1062,14 @@ class MovieDataEngine:
             sim_ids = [u["userId"] for u in sim_users]
             cohort_data = self.get_cohort_ratings(movie_to_check, sim_ids)
             cohort_data["similar_users_checked"] = len(sim_ids)
-            return {
+            res = {
                 "intent": "cohort_opinion",
                 "cohort_data": cohort_data,
                 "user_id": user_id
             }
+            if user_past_review:
+                res["user_past_review"] = user_past_review
+            return res
 
         # 3b. Grounded Explainability (Requirement 3): "Why would I like that?"
         # P0 FIX: Hook up explain_recommendation() into structured intent execution
@@ -987,11 +1087,15 @@ class MovieDataEngine:
 
             if movie_id:
                 explanation = self.explain_recommendation(user_id=user_id, movie_id=movie_id)
-                return {
+                res = {
                     "intent": "why_recommendation",
                     "explanation": explanation,
                     "user_id": user_id
                 }
+                if user_past_review:
+                    res["user_past_review"] = user_past_review
+                return res
+
         # 3c. Dynamic Taste Update & Preference Recording (Assistant Memory)
         if intent == "update_taste":
             set_favs = params.get("set_favorite_genres")
@@ -1033,6 +1137,25 @@ class MovieDataEngine:
                 "profile": self.get_user_profile(user_id)
             }
 
+        # 3d. Record Qualitative Movie Feeling / Episodic Memory
+        if intent == "share_movie_feeling":
+            user_feeling = params.get("user_feeling") or params.get("feeling") or ""
+            sentiment = params.get("sentiment", "neutral")
+            rating_val = params.get("rating")
+            review_res = self.record_user_movie_review(
+                user_id=user_id,
+                movie_title_or_id=target_movie,
+                feeling=user_feeling,
+                sentiment=sentiment,
+                rating=float(rating_val) if rating_val is not None else None
+            )
+            return {
+                "intent": "share_movie_feeling",
+                "result": review_res,
+                "user_id": user_id,
+                "profile": self.get_user_profile(user_id)
+            }
+
         # 4. Pure plot semantic search
         if intent == "plot_search" and search_query and not genres_inc:
             hits = self.search_by_plot(
@@ -1058,7 +1181,7 @@ class MovieDataEngine:
             top_k=limit
         )
 
-        return {
+        res = {
             "intent": "recommend",
             "movies": recs,
             "user_id": user_id,
@@ -1066,4 +1189,7 @@ class MovieDataEngine:
             "excluded_genres": genres_exc,
             "included_genres": genres_inc
         }
+        if user_past_review:
+            res["user_past_review"] = user_past_review
+        return res
 

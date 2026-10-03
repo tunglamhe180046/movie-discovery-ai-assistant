@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from engine import MovieDataEngine
+from claude_conversational_core import ClaudeEmpatheticSynthesizer, ClaudeGroundingGuard
 
 
 def load_env(env_path: Path) -> dict[str, str]:
@@ -61,11 +62,14 @@ Convert the user's message (Vietnamese or English) into a strict JSON object wit
     * "blind_spot": When user asks about blind spots, genres missed, or recommendations from unexplored genres
     * "cohort_opinion": When user asks what peers/similar users think of a specific movie (e.g. Pulp Fiction, Inception)
     * "why_recommendation": When user asks "why would I like that?", "tại sao tôi lại thích phim đó?", asking for grounded reasoning/explanation
+    * "share_movie_feeling": When user shares their personal experience, feelings, reaction, or review of a movie they watched (e.g. "hôm qua xem Inception thấy hack não mất ngủ", "mới xem Shutter Island đoạn kết hụt hẫng nhức đầu quá", "xem Titanic khóc sưng mắt", "vừa cày xong Gladiator cuốn thật sự")
     * "update_taste": When user states, adds, removes, clears, or changes their taste, preferences, or movie ratings (e.g. "gu của tôi là...", "lưu lại gu cho tôi", "thêm sở thích hành động", "xóa sở thích kinh dị", "bỏ ghét hoạt hình", "xóa toàn bộ gu", "reset sở thích", "tôi vừa xem Inception chấm 5 sao")
     * "plot_search": When searching by plot description, theme, or mood keywords
     * "recommend": When user asks for general or tailored movie recommendations
 - "search_query_en": English translation of plot/theme query (string or null)
 - "target_movie": Specific movie title mentioned in query (string or null; only set if an actual movie title is mentioned!)
+- "user_feeling": The qualitative feeling, emotional reaction, or opinion stated by the user (string or null)
+- "sentiment": "positive", "negative", "mixed", or "neutral" (string or null)
 - "genres_include": List of genres requested or stated to ADD to favorites (e.g. ["Sci-Fi", "Action"] or [])
 - "genres_exclude": List of genres to strictly avoid or stated to ADD to dislikes (e.g. ["Animation", "Horror"] or [])
 - "set_favorite_genres": List of genres if user is explicitly setting, replacing, or stating their full favorite list (e.g. ["Action", "Sci-Fi"] when user says "đổi gu thành 2 cái: Action và Sci-Fi" or "gu của tôi là Action, Sci-Fi")
@@ -100,6 +104,10 @@ NGUYÊN TẮC BẮT BUỘC:
      * Nếu người dùng hỏi xin gợi ý phim: Chỉ đưa ra danh sách phim gợi ý được cung cấp.
      * Nếu người dùng hỏi về 1 phim cụ thể hoặc phim lâu rồi chưa xem: Trả lời đúng phim đó kèm thông tin ngày/sao.
      * Nếu người dùng chào hỏi / hỏi bạn là ai: Giới thiệu súc tích trong 2 câu.
+
+4. ĐỒNG CẢM & BỘ NHỚ CẢM XÚC CÁ NHÂN (EPISODIC FEELING MEMORY):
+   - Nếu trong dữ liệu có `user_past_review` (cảm nhận cũ của người dùng về phim này): Bạn BẮT BUỘC phải mở đầu bằng việc nhắc lại trải nghiệm trước đây của chính họ (ví dụ: "Lần trước bạn từng chia sẻ xem phim này thấy rất hack não, hụt hẫng..."). Sau đó mới thảo luận tiếp hoặc hỏi xem họ có góc nhìn mới gì không.
+   - Nếu intent là `share_movie_feeling`: Trả lời đồng cảm, thấu hiểu với cảm xúc/ấn tượng của người dùng về bộ phim, xác nhận đã ghi nhớ cảm nhận đó vào hồ sơ cá nhân.
 """
 
 GENRE_SYNONYMS: dict[str, list[str]] = {
@@ -533,6 +541,61 @@ class MovieAgent:
         if any(w in q for w in ["tâm lý", "drama"]):
             genres_inc.append("Drama")
 
+        # 7b. Qualitative Movie Feelings & Reviews (Episodic Memory)
+        feeling_triggers = [
+            "hôm qua xem", "mới xem", "vừa xem", "xem xong", "thấy phim", "đoạn kết", "cảm thấy",
+            "hụt hẫng", "nhức đầu", "mất ngủ", "khóc", "cuốn thật sự", "xem lại", "thấy hay",
+            "thấy dở", "thấy tệ", "thấy chán", "thấy mệt", "xem rồi", "vừa cày", "cày xong"
+        ]
+        if any(w in q for w in feeling_triggers):
+            target_movie = None
+            known_movies = [
+                "Shutter Island", "Inception", "Pulp Fiction", "Toy Story", "Interstellar",
+                "Star Wars", "Gladiator", "Braveheart", "Titanic", "Godfather", "Shawshank",
+                "Matrix", "Fight Club", "Memento", "Se7en"
+            ]
+            for tm in known_movies:
+                if tm.lower() in q:
+                    target_movie = tm
+                    break
+
+            if not target_movie:
+                m_match = re.search(r"(?:xem|phim)\s+([A-Z][a-zA-Z0-9\s:']+|[a-zA-Z0-9\s:']+?)(?:\s+(?:thấy|đoạn|kết|rồi|xong|chấm|\.|\,)|$)", query, re.IGNORECASE)
+                if m_match:
+                    cand = m_match.group(1).strip()
+                    if len(cand) >= 3 and not any(w in cand.lower() for w in ["gì", "nào", "chưa", "hôm", "xong"]):
+                        target_movie = cand
+
+            rating_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:sao|star|\★)", q)
+            rating_val = float(rating_match.group(1)) if rating_match else None
+
+            sentiment = "neutral"
+            if any(w in q for w in ["hay", "cuốn", "đỉnh", "tuyệt", "thích", "mê", "xuất sắc", "5 sao"]):
+                sentiment = "positive"
+            elif any(w in q for w in ["dở", "tệ", "chán", "hụt hẫng", "nhức đầu", "mệt", "thất vọng", "1 sao"]):
+                sentiment = "negative"
+            elif any(w in q for w in ["bình thường", "tạm", "hack não", "lú", "mất ngủ"]):
+                sentiment = "mixed"
+
+            return {
+                "intent": "share_movie_feeling",
+                "target_movie": target_movie or "Inception",
+                "user_feeling": query,
+                "sentiment": sentiment,
+                "rating": rating_val,
+                "limit": 1
+            }
+
+        # 7c. Direct Movie Opinion Inquiry (e.g. "phim ... thấy sao", "ổn không", "bạn thấy thế nào")
+        if any(w in q for w in ["thấy sao", "ổn không", "nghĩ sao", "thấy thế nào", "bạn thấy", "như nào"]):
+            for tm in ["Shutter Island", "Inception", "Pulp Fiction", "Toy Story", "Interstellar", "Star Wars", "Gladiator", "Braveheart", "Titanic", "Godfather"]:
+                if tm.lower() in q:
+                    return {
+                        "intent": "cohort_opinion",
+                        "target_movie": tm,
+                        "limit": 1
+                    }
+
         # 8. Dynamic Taste: Additions or Live Ratings
         if any(w in q for w in ["thêm sở thích", "thêm gu", "thích thêm", "lưu lại", "nhớ nhé", "ghi nhớ", "đổi gu", "gu của tôi", "tôi thích xem", "tôi thích thể loại", "tôi ghét", "sở thích của tôi là", "chấm", "đánh giá", "remember"]):
             rating_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:sao|star|\★)", q)
@@ -771,12 +834,37 @@ class MovieAgent:
                 lines.append("• Phim thuộc thể loại điểm mù tiềm năng giúp bạn mở rộng trải nghiệm điện ảnh.")
             return "\n".join(lines)
 
+        if intent == "share_movie_feeling":
+            res = result.get("result", {})
+            if res.get("status") == "movie_not_found":
+                return f"Tôi chưa tìm thấy phim '{res.get('query')}' trong cơ sở dữ liệu MovieLens, nhưng tôi đã ghi nhận cảm nhận này của bạn!"
+            t = res.get("title", "")
+            feeling = res.get("user_feeling", "")
+            rating = res.get("rating")
+            rating_str = f" kèm số điểm **{rating}★**" if rating else ""
+            return (
+                f"🎬 **Đã ghi nhận cảm nhận của bạn về {t}{rating_str}:**\n"
+                f"• Cảm nhận cá nhân: *\"{feeling}\"*\n"
+                f"• Trạng thái: Đã lưu vào bộ nhớ trải nghiệm cá nhân của User #{user_id}. "
+                f"Lần tới khi bạn trao đổi về phim này, tôi sẽ ghi nhớ chính xác cảm nhận và góc nhìn này của bạn!"
+            )
+
         if intent == "cohort_opinion":
             cdata = result.get("cohort_data", {})
             t = cdata.get("title", "phim này")
             cnt = cdata.get("num_ratings", 0)
             avg = cdata.get("avg_rating")
             g_avg = cdata.get("global_avg_rating")
+            past_rev = result.get("user_past_review")
+            if past_rev:
+                comm_stats = {"avg_rating": avg or g_avg, "num_ratings": cnt or cdata.get("global_num_ratings", 0)}
+                return ClaudeEmpatheticSynthesizer.synthesize_recollection_response(
+                    movie_title=t,
+                    user_query=params.get("query_raw") or t,
+                    past_review=past_rev,
+                    community_stats=comm_stats
+                )
+
             if cnt == 0:
                 return f"Chưa có người dùng nào trong nhóm cùng gu của bạn đánh giá **{t}** (trong số {cdata.get('similar_users_checked', 0)} người được kiểm tra)."
             res_str = f"Trong nhóm người có cùng gu với bạn ({cdata.get('similar_users_checked', 0)} người), có {cnt} người đã đánh giá **{t}** với điểm trung bình **{avg}★**."

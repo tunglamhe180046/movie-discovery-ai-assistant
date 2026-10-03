@@ -101,17 +101,20 @@ def display_welcome_banner(user_id: int, profile: dict) -> None:
         table.add_row("Blind Spots (Missing)", blind_spots_str or "None")
         if dislikes:
             table.add_row("Thể loại tránh (Tự đặt)", dislikes)
+        movie_reviews = profile.get("movie_reviews", [])
+        if movie_reviews:
+            recent_rev = movie_reviews[-1]
+            feeling_preview = recent_rev.get('user_feeling', '')[:35] + ("..." if len(recent_rev.get('user_feeling', '')) > 35 else "")
+            table.add_row("Cảm nhận đã lưu", f"{recent_rev.get('title')}: \"{feeling_preview}\" ({len(movie_reviews)} phim)")
 
     console.print(table)
     console.print(
         Panel.fit(
             "[bold green]Gợi ý tương tác & Quản lý sở thích:[/bold green]\n"
             "• [italic]Thêm sở thích phim hành động và khoa học viễn tưởng[/italic] (Thêm gu yêu thích)\n"
-            "• [italic]Xóa sở thích khoa học viễn tưởng[/italic] (Xóa gu khỏi danh sách thích)\n"
-            "• [italic]Tôi ghét phim kinh dị[/italic] (Thêm thể loại tránh gợi ý)\n"
-            "• [italic]Bỏ ghét phim kinh dị[/italic] (Xóa khỏi danh sách tránh)\n"
-            "• [italic]Xóa toàn bộ gu / Reset sở thích[/italic] (Xóa hết gu đã lưu để làm lại)\n"
             "• [italic]Tôi vừa xem Inception và chấm 5 sao[/italic] (Lưu đánh giá mới)\n"
+            "• [italic]Hôm qua mới xem Shutter Island, đoạn kết hụt hẫng và nhức đầu[/italic] (Tự động lưu cảm nhận cá nhân)\n"
+            "• [italic]Cái phim Shutter Island đó ổn nhỉ, bạn thấy sao?[/italic] (Thảo luận lại theo cảm nhận cũ)\n"
             "• [italic]Tối nay xem gì hợp gu tôi?[/italic] | [italic]Why do you think I'd like Inception?[/italic]\n"
             "• Lệnh nhanh: [yellow]/switch <0-4>[/yellow] (Đổi user), [yellow]/profile[/yellow] (Xem lại gu), [yellow]exit[/yellow] (Thoát).",
             title="💡 Hướng Dẫn & Lệnh Nhanh",

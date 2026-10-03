@@ -1,1 +1,38 @@
-{}
+{
+  "1": {
+    "favorite_genres": [],
+    "disliked_genres": [],
+    "custom_ratings": [
+      {
+        "movieId": 74458,
+        "title": "Shutter Island",
+        "rating": 5.0,
+        "genres": "Drama|Mystery|Thriller",
+        "timestamp": 1791056969
+      }
+    ],
+    "has_explicit_preference": false,
+    "notes": "",
+    "movie_reviews": [
+      {
+        "movieId": 74458,
+        "title": "Shutter Island",
+        "user_feeling": "đoạn kết hụt hẫng và xem nhức cả đầu thật sự",
+        "sentiment": "negative",
+        "rating": 5.0,
+        "created_at": 1791056962,
+        "date_str": "03/10/2026"
+      }
+    ]
+  },
+  "0": {
+    "favorite_genres": [
+      "Animation",
+      "Comedy"
+    ],
+    "disliked_genres": [],
+    "custom_ratings": [],
+    "has_explicit_preference": true,
+    "notes": ""
+  }
+}

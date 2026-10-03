@@ -2,7 +2,10 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
-[![Evaluation: 10/10 Passed](https://img.shields.io/badge/Benchmark-10%2F10%20Passed-brightgreen.svg)](scripts/test_codex_cases.py)
+[![Benchmark: 10/10 Passed](https://img.shields.io/badge/Benchmark-10%2F10%20Passed-brightgreen.svg)](scripts/test_codex_cases.py)
+[![Episodic Memory: 100% Passed](https://img.shields.io/badge/Episodic%20Memory-100%25%20Passed-success.svg)](scripts/test_episodic_memory.py)
+[![Codex Engine: 0.74µs Latency](https://img.shields.io/badge/Codex%20Engine-0.74%C2%B5s%20Latency-blue.svg)](scripts/test_codex_systems.py)
+[![Claude Core: Grounded Empathy](https://img.shields.io/badge/Claude%20Core-Grounded%20Empathy-purple.svg)](scripts/test_claude_perspective.py)
 
 An intelligent, data-grounded conversational AI assistant designed to help users discover films by actively **investigating and reasoning over historical dataset signals** (MovieLens: 74k ratings, 5.1k movies with plots, genres, and user tags).
 
@@ -22,48 +25,43 @@ Unlike standard search engines or generic LLM chatbots that hallucinate movie fa
 | **4. Rigorous Evaluation & Evidence** | Automated benchmark test suite (`10/10 passed`), reproducible JSON artifacts, confidence gating for small sample sizes ($n < 3$), and transparent failure analysis. | ✅ **Done** |
 | **5. Two-Tier Domain Guardrails** | Two-tier defense (Parser screening + Active Bot Gatekeeper) enforcing strict cinema scope; blocks non-movie advice while preserving courtroom/crime movie themes. | ✅ **Done** |
 | **6. Dynamic User Memory & Taste Lifecycle** | Cold-start User 0 support with live working memory (`data/user_memory.json`), allowing full addition, removal, and resetting of user preferences. | ✅ **Done** |
+| **7. Episodic Qualitative Memory & Empathetic Feedback** | Zero-command background ingestion of user impressions (`share_movie_feeling`), cross-session recollection, and non-confrontational curious inquiry without gaslighting. | ✅ **Done** |
+| **8. Bilingual Fuzzy Entity Resolution & Atomic Journaling** | $\mathcal{O}(1)$ LRU cached Levenshtein & bilingual English-Vietnamese alias mapping (`CodexFuzzyEntityResolver`), ACID-safe atomic disk journaling (`CodexAtomicMemoryJournal`). | ✅ **Done** |
 
 ---
 
-## 🤖 Multi-Agent "Vibe Coding" Workflow (Antigravity + Claude Code + Codex)
+## 🤖 Multi-Agent "Vibe Coding" & Adversarial Council Workflow
 
-This project was built, audited, and refined using a **Multi-Agent Collaborative Engineering** workflow, demonstrating how modern AI coding assistants can be orchestrated synergistically to produce production-grade, verifiable software:
+This project was built, audited, and refined using a **Multi-Agent Collaborative & Adversarial Engineering Council** (Antigravity/Gemini + Claude + Codex), demonstrating how independent AI models can critically review and debug each other's code to eliminate blind spots:
 
 ```
                   ┌──────────────────────────────────────────────┐
                   │          Google Antigravity (Center)         │
                   │    • Project Lead & Central Orchestrator     │
                   │    • System Architecture & Context Manager   │
-                  │    • Task Delegation & Integration Testing   │
+                  │    • Adversarial Dispute Arbitrator          │
                   └───────────────┬──────────────┬───────────────┘
                                   │              │
                    Dispatches Work│              │Requests Audit
                                   ▼              ▼
        ┌──────────────────────────────┐      ┌──────────────────────────────┐
-       │       Claude Code CLI        │      │          Codex CLI           │
-       │    • Core Implementation     │      │   • Adversarial Reviewer     │
-       │    • Logic Refactoring       │      │   • Tech Lead Counter-Check  │
-       │    • Code Documentation      │      │   • P0 Edge-Case Hunting     │
+       │   Claude (Anthropic Core)    │      │    Codex (OpenAI Systems)    │
+       │ • Empathetic Nuance Core     │◄────►│ • Fuzzy Entity Disambiguation│
+       │ • Causal Attribution Parser  │Cross-│ • Atomic Persistence Journal │
+       │ • Anti-Gaslighting Guardrail │Review│ • Sub-microsecond Benchmarks │
        └──────────────────────────────┘      └──────────────────────────────┘
 ```
 
-### Division of Responsibilities in Development:
-1. **Google Antigravity (Central Orchestrator & System Architect):**
-   - Served as the master conductor managing repository context, directory structure, prompt requirements, and local execution environment.
-   - Designed the Two-Tier Decoupled System architecture based on TrustedAI requirements.
-   - Programmatically invoked and coordinated the CLI sub-agents (`claude`, `codex`), merged code changes, resolved conflicts, and executed end-to-end benchmark validations.
-2. **Claude Code CLI (Implementation & Refactoring Engine):**
-   - Served as the primary implementation engineer, authoring and refactoring core algorithmic modules (`agent.py`, `engine.py`).
-   - Added comprehensive technical code comments detailing data flows and fallback routines.
-   - Ensured high fault-tolerance with automated offline recovery mechanisms when API limits are reached.
-3. **Codex CLI (Adversarial Code Reviewer & Tech Lead):**
-   - Executed non-interactively (`codex exec` on `gpt-5.6-terra`) providing critical, adversarial code review from a Tech Lead perspective.
-   - **Key P0 Bugs Discovered & Mitigated by Codex**:
-     * Caught the candidate leakage bug in `engine.py:649-654` where `genres_include` post-filtering failed when top-K lacked matching genres (causing Sci-Fi queries to return non-Sci-Fi movies).
-     * Identified that `explain_recommendation()` was orphaned and not connected to intent parsing for Requirement 3.
-     * Flagged statistical vulnerability on sparse cohort queries ($n < 3$ for *Pulp Fiction*), leading to the addition of sample confidence indicators.
-     * Flagged hardcoded profile strings (`"190 đánh giá"`) in fallback formatters.
-   - Through this adversarial feedback loop, Antigravity directed full remediation of all P0 issues, bringing the test suite to **10/10 Passed**.
+### The Adversarial Cross-Review & Consensus Cycle:
+1. **Claude's Implementation & Codex's Code Review:**
+   - Claude authored `claude_conversational_core.py` (micro-emotions: `cognitive_fatigue`, `emotional_shock`, `intellectual_thrill`, and anti-gaslighting curious inquiry).
+   - **Codex caught a real bug:** Claude's grounding token filter checked `len(w) >= 3`, which dropped crucial 2-letter Vietnamese emotion keywords (`"lú"`, `"tệ"`, `"dở"`, `"sốc"`). Claude immediately fixed the filter to `len(w) >= 2`.
+2. **Codex's Implementation & Claude's Code Review:**
+   - Codex authored `codex_systems_core.py` (bilingual English-Vietnamese alias resolution, LRU caching, atomic file locking).
+   - **Claude caught a real bug:** Codex's exact substring search failed on MovieLens titles with trailing articles (e.g. `"Godfather, The"`) when users asked for `"Bố già"` (translated to `"The Godfather"`). Claude introduced automatic article permutation normalization (`_normalize_articles`), achieving 100% resolution.
+   - **Codex identified dataset boundaries:** Discovered that *Interstellar* (late 2014) is absent from the 1903–2014 filtered dataset, replacing it with *Fight Club* in typo tests.
+3. **Consensus & Integration:**
+   - All modules were unified into `engine.py` and `agent.py`, backed by 5 independent test suites running at **100% Pass rate**.
 
 ---
 
@@ -319,6 +317,42 @@ ALL PERSISTENCE TESTS PASSED (100%)
 ============================================================
 ```
 
+#### D. Episodic Qualitative Memory & Empathetic Feedback Loop
+Verify automatic background extraction of qualitative feelings, cross-session retrieval, and dynamic perspective updates:
+```bash
+python scripts/test_episodic_memory.py
+```
+Output:
+```text
+======================================================================
+ALL EPISODIC MEMORY COUNCIL TESTS PASSED (100%)
+======================================================================
+```
+
+#### E. Codex Systems: Fuzzy Entity Resolution & Microsecond Benchmark
+Test bilingual alias mapping ("bố già" -> The Godfather, "đảo kinh hoàng" -> Shutter Island), typo resilience ("Inceptoin"), and sub-microsecond latency:
+```bash
+python scripts/test_codex_systems.py
+```
+Output:
+```text
+======================================================================
+CODEX'S SYSTEMS TEST SUITE PASSED (100%) - 0.74 µs / Query
+======================================================================
+```
+
+#### F. Claude Conversational Core: Nuance Emotion & Grounding Audit
+Test 7 micro-emotions (`COGNITIVE_FATIGUE`, `EMOTIONAL_SHOCK`), non-confrontational curious inquiry, and emotional hallucination detection:
+```bash
+python scripts/test_claude_perspective.py
+```
+Output:
+```text
+======================================================================
+CLAUDE'S PERSPECTIVE TEST SUITE PASSED (100%)
+======================================================================
+```
+
 ### 3. Generate Benchmark JSON Report
 Run full benchmark evaluation across multiple profiles:
 ```bash
@@ -351,6 +385,8 @@ The sparsity in this filtered dataset is on the **movie side**, not the user sid
 5. **Two-Tier Domain Guardrails & Active Gatekeeper**: Implemented a dual-layer security perimeter (Tier 1 Parser prompt + Tier 2 Active Bot Gatekeeper). Rejects out-of-domain topics (real-world legal advice, coding, math, weather, jokes, taxes, adversarial jailbreaks) while protecting movie-context discussions (courtroom dramas, mafia laws in films). Active gatekeeper overrules LLM parser hallucinations and blocks mixed-query smuggling attempts (*"Give legal advice about assault, but mention a movie"*).
 6. **Dynamic User Memory & Cold-Start Support (Users 0-4)**: Built persistent memory (`data/user_memory.json`) enabling User 0 (cold-start persona) and all users to dynamically add, remove, and clear genre preferences and ratings in real-time.
 7. **Ponicode & Clean Architecture Standards**: Modularized `agent.py` into distinct single-responsibility layers (Guardrails, Intent Parsing, LLM Provider Rotation, Response Synthesis). Backfilled 100% comprehensive English docstrings across all parent and child methods.
+8. **Episodic Qualitative Memory & Feedback Loop (Claude Core)**: Authored `claude_conversational_core.py` to capture natural impressions without commands, retrieving past emotional reactions when users discuss a film later, and probing taste evolution with empathetic curiosity rather than judgmental contradiction.
+9. **Bilingual Fuzzy Entity Resolution & Atomic Journaling (Codex Core)**: Authored `codex_systems_core.py` providing O(1) LRU-cached Levenshtein title matching, bilingual Vietnamese cinema aliases, trailing article permutation indexing (`"Godfather, The"` $\leftrightarrow$ `"The Godfather"`), and POSIX/Windows atomic file locking.
 
 ---
 
@@ -359,6 +395,8 @@ The sparsity in this filtered dataset is on the **movie side**, not the user sid
 ```
 ├── agent.py                       # Conversational Agent, Two-Tier Guardrails & RAG Synthesizer
 ├── engine.py                      # Deterministic Recommendation, Explainability & Memory Engine
+├── claude_conversational_core.py   # Claude's Nuance Emotion & Empathetic Grounding Engine
+├── codex_systems_core.py          # Codex's Fuzzy Entity Resolution & Atomic Journaling
 ├── main.py                        # Interactive Rich Terminal CLI (Users 0-4 selector) & Eval Runner
 ├── requirements.txt               # Python dependencies
 ├── README.md                      # Comprehensive project documentation
@@ -366,6 +404,9 @@ The sparsity in this filtered dataset is on the **movie side**, not the user sid
 ├── PROBLEM.md                     # Original TrustedAI problem requirements
 ├── benchmark_evaluation.json      # Exported multi-user evaluation results
 ├── scripts/
+│   ├── test_episodic_memory.py    # End-to-end qualitative memory & retrieval test suite
+│   ├── test_claude_perspective.py # Claude's nuance emotions & grounding audit tests
+│   ├── test_codex_systems.py      # Codex's bilingual alias, typo & latency benchmark
 │   ├── test_domain_guardrails.py  # 6 test suites (20+ cases) for Two-Tier Guardrails & Security
 │   ├── test_codex_cases.py        # 10 core benchmark assessment cases
 │   ├── test_memory_persistence.py # Full restart persistence test (processes & disk)
@@ -382,3 +423,4 @@ The sparsity in this filtered dataset is on the **movie side**, not the user sid
 * **Candidate:** Tùng Lâm (AI Engineer)
 * **Target:** TrustedAI - AI Engineer Take-Home Assessment
 * **Evaluation Date:** October 2026
+

@@ -5,6 +5,7 @@ Optimized and hardened with review feedback from Codex.
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -16,6 +17,30 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 DEFAULT_DATA_DIR = Path(__file__).resolve().parent / "data" / "ml-latest-small-filtered"
 POPULAR_GENRE_MIN_COUNT = 20
+
+ALL_CANONICAL_GENRES: dict[str, str] = {
+    "action": "Action",
+    "adventure": "Adventure",
+    "animation": "Animation",
+    "children": "Children",
+    "comedy": "Comedy",
+    "crime": "Crime",
+    "documentary": "Documentary",
+    "drama": "Drama",
+    "fantasy": "Fantasy",
+    "film-noir": "Film-Noir",
+    "noir": "Film-Noir",
+    "horror": "Horror",
+    "musical": "Musical",
+    "mystery": "Mystery",
+    "romance": "Romance",
+    "sci-fi": "Sci-Fi",
+    "scifi": "Sci-Fi",
+    "thriller": "Thriller",
+    "war": "War",
+    "western": "Western",
+    "imax": "IMAX",
+}
 
 
 class MovieDataEngine:
@@ -63,24 +88,52 @@ class MovieDataEngine:
         self._build_user_item_matrix()
         self._build_tfidf_index()
 
+    def _canonicalize_genre(self, g: str) -> str:
+        """Standardize raw or colloquial genre names to canonical MovieLens casing."""
+        if not g:
+            return ""
+        clean = str(g).strip().lower()
+        return ALL_CANONICAL_GENRES.get(clean, str(g).strip().title())
+
+    def _get_historical_top_genres(self, user_id: int, top_n: int = 5) -> list[str]:
+        """Extract baseline top genres from historical rating CSVs."""
+        user_ratings = self.ratings[self.ratings["userId"] == user_id]
+        if user_ratings.empty:
+            return []
+        rated = user_ratings.merge(self.movies[["movieId", "genre_list"]], on="movieId")
+        liked = rated[rated["rating"] >= 4.0]
+        counts = (liked if not liked.empty else rated).explode("genre_list")["genre_list"].value_counts()
+        return [str(g) for g in counts.head(top_n).index if g]
+
     def _load_user_memory(self) -> dict[str, dict]:
+        """Load persistent working memory from disk safely."""
         if self.user_memory_path.exists():
             try:
                 with open(self.user_memory_path, "r", encoding="utf-8") as f:
-                    return json.load(f)
+                    data = json.load(f)
+                    if isinstance(data, dict):
+                        return data
             except Exception:
                 return {}
         return {}
 
     def _save_user_memory(self) -> None:
+        """Persist working memory to disk atomically to prevent empty 0-byte file corruption."""
         try:
-            with open(self.user_memory_path, "w", encoding="utf-8") as f:
+            self.user_memory_path.parent.mkdir(parents=True, exist_ok=True)
+            temp_path = self.user_memory_path.with_suffix(".tmp")
+            with open(temp_path, "w", encoding="utf-8") as f:
                 json.dump(self.user_memory, f, ensure_ascii=False, indent=2)
+            temp_path.replace(self.user_memory_path)
         except Exception:
-            pass
+            try:
+                with open(self.user_memory_path, "w", encoding="utf-8") as f:
+                    json.dump(self.user_memory, f, ensure_ascii=False, indent=2)
+            except Exception:
+                pass
 
     def _inject_custom_memory_ratings(self) -> None:
-        """Inject user ratings saved in memory into the active ratings DataFrame."""
+        """Inject user ratings saved in memory into the active ratings DataFrame without duplicates."""
         rows_to_add = []
         for uid_str, udata in self.user_memory.items():
             try:
@@ -88,9 +141,12 @@ class MovieDataEngine:
             except ValueError:
                 continue
             for cr in udata.get("custom_ratings", []):
+                mid = int(cr["movieId"])
+                # Avoid duplicate accumulation across restarts: drop existing rating row if present
+                self.ratings = self.ratings[~((self.ratings["userId"] == uid) & (self.ratings["movieId"] == mid))]
                 rows_to_add.append({
                     "userId": uid,
-                    "movieId": cr["movieId"],
+                    "movieId": mid,
                     "rating": float(cr["rating"]),
                     "timestamp": cr.get("timestamp", int(pd.Timestamp.now().timestamp()))
                 })
@@ -100,6 +156,7 @@ class MovieDataEngine:
     def record_user_preference(
         self,
         user_id: int,
+        set_favorite_genres: list[str] | None = None,
         favorite_genres: list[str] | None = None,
         disliked_genres: list[str] | None = None,
         remove_favorite_genres: list[str] | None = None,
@@ -114,6 +171,7 @@ class MovieDataEngine:
                 "favorite_genres": [],
                 "disliked_genres": [],
                 "custom_ratings": [],
+                "has_explicit_preference": False,
                 "notes": ""
             }
 
@@ -123,6 +181,7 @@ class MovieDataEngine:
         if clear_all:
             mem["favorite_genres"] = []
             mem["disliked_genres"] = []
+            mem["has_explicit_preference"] = False
             mem["notes"] = ""
             self._save_user_memory()
             return {
@@ -134,15 +193,28 @@ class MovieDataEngine:
                 "notes": ""
             }
 
-        # 1. Removals
+        # Case 1: Explicitly overwrite / set entire favorite list
+        if set_favorite_genres is not None:
+            clean_set = [self._canonicalize_genre(g) for g in set_favorite_genres if g]
+            seen = set()
+            mem["favorite_genres"] = [g for g in clean_set if not (g.lower() in seen or seen.add(g.lower()))]
+            mem["has_explicit_preference"] = True
+
+        # Case 2: Removals from favorites
         removed_favs = []
         if remove_favorite_genres:
+            # Seed from historical baseline if user hasn't customized yet
+            if not mem.get("has_explicit_preference") and not mem.get("favorite_genres"):
+                mem["favorite_genres"] = self._get_historical_top_genres(user_id)
+
             rem_f_lower = {g.lower() for g in remove_favorite_genres}
             curr_favs = mem.get("favorite_genres", [])
             new_favs = [g for g in curr_favs if g.lower() not in rem_f_lower]
             removed_favs = [g for g in curr_favs if g.lower() in rem_f_lower]
             mem["favorite_genres"] = new_favs
+            mem["has_explicit_preference"] = True
 
+        # Case 3: Removals from dislikes
         removed_dislikes = []
         if remove_disliked_genres:
             rem_d_lower = {g.lower() for g in remove_disliked_genres}
@@ -151,24 +223,33 @@ class MovieDataEngine:
             removed_dislikes = [g for g in curr_dislikes if g.lower() in rem_d_lower]
             mem["disliked_genres"] = new_dislikes
 
-        # 2. Additions
+        # Case 4: Additions to favorites
         added_favs = []
         if favorite_genres:
+            if not mem.get("has_explicit_preference") and not mem.get("favorite_genres"):
+                mem["favorite_genres"] = self._get_historical_top_genres(user_id)
+
             existing = {g.lower() for g in mem.get("favorite_genres", [])}
             for g in favorite_genres:
-                if g.lower() not in existing:
-                    mem["favorite_genres"].append(g)
-                    added_favs.append(g)
-                    existing.add(g.lower())
+                canon = self._canonicalize_genre(g)
+                if canon and canon.lower() not in existing:
+                    mem["favorite_genres"].append(canon)
+                    added_favs.append(canon)
+                    existing.add(canon.lower())
+            mem["has_explicit_preference"] = True
 
+        # Case 5: Additions to dislikes (avoidance)
         added_dislikes = []
         if disliked_genres:
             existing_d = {g.lower() for g in mem.get("disliked_genres", [])}
             for g in disliked_genres:
-                if g.lower() not in existing_d:
-                    mem["disliked_genres"].append(g)
-                    added_dislikes.append(g)
-                    existing_d.add(g.lower())
+                canon = self._canonicalize_genre(g)
+                if canon and canon.lower() not in existing_d:
+                    mem["disliked_genres"].append(canon)
+                    added_dislikes.append(canon)
+                    existing_d.add(canon.lower())
+                # Also remove from favorites if user now dislikes it
+                mem["favorite_genres"] = [f for f in mem.get("favorite_genres", []) if f.lower() != canon.lower()]
 
         if notes is not None:
             mem["notes"] = notes
@@ -330,11 +411,20 @@ class MovieDataEngine:
         else:
             genre_counts = rated.explode("genre_list")["genre_list"].value_counts()
 
-        top_genres = [
-            {"genre": genre, "count": int(count)}
-            for genre, count in genre_counts.head(5).items()
-            if genre
-        ]
+        has_explicit = custom_mem.get("has_explicit_preference", False)
+        if has_explicit and custom_favs:
+            # User explicitly declared or customized their active favorite genres
+            top_genres = [
+                {"genre": g, "count": int(genre_counts.get(g, 1)), "custom": True}
+                for g in custom_favs
+            ]
+        else:
+            dislike_lower = {d.lower() for d in custom_dislikes}
+            top_genres = [
+                {"genre": genre, "count": int(count)}
+                for genre, count in genre_counts.head(5).items()
+                if genre and genre.lower() not in dislike_lower
+            ]
 
         # Top rated movies the user has watched
         top_movies_df = rated.sort_values(["rating", "title"], ascending=[False, True]).head(5)
@@ -363,13 +453,17 @@ class MovieDataEngine:
                 )
         blind_spots = blind_spots[:5]
 
+        notes = custom_mem.get("notes", "")
         return {
             "user_id": user_id,
             "num_ratings": num_ratings,
             "avg_rating": avg_rating,
             "top_genres": top_genres,
+            "disliked_genres": custom_dislikes,
             "top_movies": top_movies,
             "blind_spots": blind_spots,
+            "has_custom_profile": bool(has_explicit or custom_favs or custom_dislikes or notes),
+            "notes": notes,
         }
 
     # ------------------------------------------------------------------
@@ -900,6 +994,7 @@ class MovieDataEngine:
                 }
         # 3c. Dynamic Taste Update & Preference Recording (Assistant Memory)
         if intent == "update_taste":
+            set_favs = params.get("set_favorite_genres")
             stated_favs = params.get("genres_include") or params.get("favorite_genres")
             stated_dislikes = params.get("genres_exclude") or params.get("disliked_genres")
             remove_favs = params.get("remove_genres_include") or params.get("remove_favorite_genres")
@@ -910,9 +1005,10 @@ class MovieDataEngine:
             notes = params.get("notes")
 
             result_data = {}
-            if stated_favs or stated_dislikes or remove_favs or remove_dislikes or clear_all or notes is not None:
+            if set_favs or stated_favs or stated_dislikes or remove_favs or remove_dislikes or clear_all or notes is not None:
                 pref_res = self.record_user_preference(
                     user_id=user_id,
+                    set_favorite_genres=set_favs,
                     favorite_genres=stated_favs,
                     disliked_genres=stated_dislikes,
                     remove_favorite_genres=remove_favs,

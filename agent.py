@@ -68,6 +68,7 @@ Convert the user's message (Vietnamese or English) into a strict JSON object wit
 - "target_movie": Specific movie title mentioned in query (string or null; only set if an actual movie title is mentioned!)
 - "genres_include": List of genres requested or stated to ADD to favorites (e.g. ["Sci-Fi", "Action"] or [])
 - "genres_exclude": List of genres to strictly avoid or stated to ADD to dislikes (e.g. ["Animation", "Horror"] or [])
+- "set_favorite_genres": List of genres if user is explicitly setting, replacing, or stating their full favorite list (e.g. ["Action", "Sci-Fi"] when user says "đổi gu thành 2 cái: Action và Sci-Fi" or "gu của tôi là Action, Sci-Fi")
 - "remove_genres_include": List of genres user wants to REMOVE from favorites (e.g. ["Sci-Fi"] when user says "xóa sở thích sci-fi")
 - "remove_genres_exclude": List of genres user wants to REMOVE from dislikes (e.g. ["Horror"] when user says "bỏ ghét kinh dị")
 - "clear_all": Boolean (true if user wants to delete/clear all preferences and reset taste, e.g. "xóa toàn bộ gu", "reset sở thích", "xóa hết gu")
@@ -476,8 +477,27 @@ class MovieAgent:
         if any(w in q for w in ["xóa hết gu", "xóa toàn bộ gu", "xóa tất cả gu", "reset gu", "reset sở thích", "xóa sở thích của tôi", "clear taste", "xóa hết sở thích"]):
             return {"intent": "update_taste", "clear_all": True, "limit": 1}
 
-        # 6. Dynamic Taste: Removals
-        is_remove_fav = any(w in q for w in ["xóa sở thích", "bỏ sở thích", "bỏ gu", "xóa gu", "không thích nữa", "bỏ thể loại", "xóa thể loại", "xóa khỏi gu", "bỏ khỏi gu"])
+        # 6a. Dynamic Taste: Set / Overwrite entire favorite list
+        # E.g. "đổi thành 2 cái: Hành động và Viễn tưởng", "xóa đi và đổi thành 2 cái: Action, Sci-Fi", "đổi gu thành..."
+        is_set_taste = any(w in q for w in [
+            "đổi gu thành", "đổi sở thích thành", "thay đổi gu thành", "đổi thành",
+            "chỉ thích", "chỉ để lại", "chỉ giữ lại", "chỉ xem", "sở thích của tôi là",
+            "sở thích chỉ là", "set taste"
+        ])
+        if is_set_taste:
+            set_favs = []
+            for canon, syns in GENRE_SYNONYMS.items():
+                if any(s in q for s in syns):
+                    set_favs.append(canon)
+            if set_favs:
+                return {
+                    "intent": "update_taste",
+                    "set_favorite_genres": set_favs,
+                    "limit": 1
+                }
+
+        # 6b. Dynamic Taste: Removals
+        is_remove_fav = any(w in q for w in ["xóa sở thích", "bỏ sở thích", "bỏ gu", "xóa gu", "không thích nữa", "bỏ thể loại", "xóa thể loại", "xóa khỏi gu", "bỏ khỏi gu", "xóa bớt"])
         is_remove_dislike = any(w in q for w in ["bỏ ghét", "không ghét nữa", "hết ghét", "xóa ghét", "khỏi danh sách ghét", "bỏ tránh"])
 
         if is_remove_fav or is_remove_dislike:
@@ -778,6 +798,8 @@ class MovieAgent:
             removed_d = res.get("removed_dislikes", [])
 
             lines = [f"✅ Đã cập nhật hồ sơ sở thích của bạn (User #{user_id}):"]
+            if res.get("favorite_genres") and not added_f and not removed_f:
+                lines.append(f"• Thiết lập gu yêu thích mới: **{favs}**")
             if added_f:
                 lines.append(f"• Thêm vào gu yêu thích: **{', '.join(added_f)}**")
             if removed_f:
@@ -787,11 +809,11 @@ class MovieAgent:
             if removed_d:
                 lines.append(f"• Bỏ khỏi danh sách tránh: **{', '.join(removed_d)}**")
 
-            lines.append(f"• Gu yêu thích hiện tại: **{favs or 'Chưa có'}**")
+            lines.append(f"• Gu yêu thích hiện tại ({len(res.get('favorite_genres', []))} thể loại): **{favs or 'Chưa có'}**")
             lines.append(f"• Thể loại tránh hiện tại: **{dislikes or 'Không có'}**")
             if rating_rec and "title" in rating_rec:
                 lines.append(f"• Đã lưu đánh giá: **{rating_rec['title']}** - **{rating_rec['rating']}★**")
-            lines.append("Mọi gợi ý tiếp theo sẽ được cá nhân hóa chính xác theo danh sách này.")
+            lines.append("Mọi gợi ý tiếp theo và thông tin hiển thị đã được lưu bền vững vào hệ thống.")
             return "\n".join(lines)
 
         if intent == "blind_spot":

@@ -88,8 +88,13 @@ def display_welcome_banner(user_id: int, profile: dict) -> None:
     else:
         table.add_row("Ratings Count", str(num_ratings))
         table.add_row("Average Rating", f"{profile.get('avg_rating', 'N/A')} ★")
-        top_genres_str = ", ".join([f"{g['genre']} ({g['count']})" for g in profile.get("top_genres", [])[:4]])
-        table.add_row("Favorite Genres", top_genres_str or "None")
+        top_genres = profile.get("top_genres", [])
+        if any(g.get("custom") for g in top_genres):
+            top_genres_str = ", ".join([f"{g['genre']} (Tùy chỉnh)" for g in top_genres])
+            table.add_row("Favorite Genres (Tự đặt)", top_genres_str or "None")
+        else:
+            top_genres_str = ", ".join([f"{g['genre']} ({g['count']})" for g in top_genres[:5]])
+            table.add_row("Favorite Genres", top_genres_str or "None")
         top_movies_str = ", ".join([f"{m['title']} ({m['rating']}★)" for m in profile.get("top_movies", [])[:3]])
         table.add_row("Top Rated Movies", top_movies_str or "None")
         blind_spots_str = ", ".join([b["genre"] for b in profile.get("blind_spots", [])[:3]])

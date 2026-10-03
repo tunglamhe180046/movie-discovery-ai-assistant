@@ -302,10 +302,20 @@ Output:
 RUNNING 10 CODEX BENCHMARK TEST CASES
 ============================================================
 [Case 1] Query: 'Cho tôi 1 tên phim lâu rồi tôi chưa xem...' -> [PASS]
-[Case 2] Query: 'Tìm phim khoa học viễn tưởng... đừng kinh dị' -> [PASS]
-...
 ============================================================
 TEST SUMMARY: 10/10 Passed!
+============================================================
+```
+
+#### C. User Taste Memory Persistence Across Terminal Restarts
+Verify that dynamic user preference modifications (add, remove, replace, reset) persist to disk and survive complete terminal process termination:
+```bash
+python scripts/test_memory_persistence.py
+```
+Output:
+```text
+============================================================
+ALL PERSISTENCE TESTS PASSED (100%)
 ============================================================
 ```
 
@@ -358,6 +368,7 @@ The sparsity in this filtered dataset is on the **movie side**, not the user sid
 ├── scripts/
 │   ├── test_domain_guardrails.py  # 6 test suites (20+ cases) for Two-Tier Guardrails & Security
 │   ├── test_codex_cases.py        # 10 core benchmark assessment cases
+│   ├── test_memory_persistence.py # Full restart persistence test (processes & disk)
 │   ├── test_groq_connection.py     # API latency & connectivity verification
 │   └── verify_dataset.py          # Dataset integrity verification script
 └── data/

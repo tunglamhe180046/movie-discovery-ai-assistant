@@ -20,6 +20,8 @@ Unlike standard search engines or generic LLM chatbots that hallucinate movie fa
 | **2. Multi-Signal Synthesis** | Combines user taste vectors, plot TF-IDF semantic search ($25k$ features), cohort opinions, and strict genre inclusion/exclusion constraints. | ✅ **Done** |
 | **3. Grounded Explainability ("Why would I like that?")** | `explain_recommendation()` traces back exact matching genres from the user's top-rated history, peer cohort ratings with sample confidence, and blind spot status. | ✅ **Done** |
 | **4. Rigorous Evaluation & Evidence** | Automated benchmark test suite (`10/10 passed`), reproducible JSON artifacts, confidence gating for small sample sizes ($n < 3$), and transparent failure analysis. | ✅ **Done** |
+| **5. Two-Tier Domain Guardrails** | Two-tier defense (Parser screening + Active Bot Gatekeeper) enforcing strict cinema scope; blocks non-movie advice while preserving courtroom/crime movie themes. | ✅ **Done** |
+| **6. Dynamic User Memory & Taste Lifecycle** | Cold-start User 0 support with live working memory (`data/user_memory.json`), allowing full addition, removal, and resetting of user preferences. | ✅ **Done** |
 
 ---
 
@@ -65,29 +67,39 @@ This project was built, audited, and refined using a **Multi-Agent Collaborative
 
 ---
 
-## 🏛 Architecture
+## 🏛 Architecture & Security Design
 
 ```
-[ User / Terminal CLI ]
-          │
-          ▼  (Natural Language Query in Vietnamese / English)
+[ User Query in English / Vietnamese ]
+                 │
+                 ▼
 ┌────────────────────────────────────────────────────────────────────────┐
-│  Tier 1: Conversational Agent (agent.py)                                │
-│  • Structured Intent & Parameter Parser (DeepSeek / Groq / Offline)   │
-│  • Intent Routing: profile, recommend, cohort, why_recommendation...   │
-│  • Fact-Constrained Natural Synthesizer (No Hallucinations)            │
-│  • Automatic API Key Rotation + Graceful Offline Fallback Engine       │
+│  Tier 1 Guardrail: Intent & Parameter Parser (agent.py)                │
+│  • DeepSeek / Groq LLM Structured JSON Extraction (0.0 Temperature)    │
+│  • Heuristic Offline Pattern Classifier (Zero external dependency)    │
+│  • Domain Boundary Screening: Declares `out_of_domain` for non-movies │
+│  • Hard Action Filters: Catches mixed-prompt smuggling attempts        │
 └───────────────────────────────────┬────────────────────────────────────┘
-                                    │ Structured Parameters (JSON)
+                                    │
                                     ▼
 ┌────────────────────────────────────────────────────────────────────────┐
-│  Tier 2: Deterministic Data Engine (engine.py)                         │
+│  Tier 2 Guardrail: Active Bot Gatekeeper (agent.py)                    │
+│  • Second line of defense: Does NOT blindly trust LLM parser output    │
+│  • Overrules parser hallucinations on off-domain/real-world queries    │
+│  • Short-circuits execution before data retrieval or synthesis        │
+│  • Returns grounded, polite cinema-domain refusal message             │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ (Gated: Only in-domain queries proceed)
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│  Deterministic Data Engine (engine.py)                                 │
 │  • User Profiling & Global Genre Distribution Caching                  │
 │  • User-User Pearson Collaborative Filtering (User Taste Vectors)      │
 │  • Content Search: TF-IDF Plot Vectorizer + Cosine Similarity          │
 │  • Strict Constraint Engine (Hard genre include/exclude gating)        │
 │  • Sample Confidence Estimator (High / Medium / Low for cohorts)       │
 │  • Grounded Reasoner: Explains recommendations with historical proof    │
+│  • Working Memory: Persistent user preferences (`data/user_memory.json`)│
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -217,25 +229,31 @@ The sparsity in this filtered dataset is on the **movie side**, not the user sid
 2. **Grounded Explainability Pipeline**: Added the `why_recommendation` intent, hooking [`explain_recommendation()`](engine.py) directly into the agent. Users asking *"Why would I like that?"* receive exact matching genres, personal rating comparison, and cohort rating breakdown.
 3. **Cohort Sample Confidence Gate**: For cult films with sparse peer ratings (e.g. *Pulp Fiction* where only 2 peers rated it), the system explicitly flags `confidence: "low (sparse cohort sample)"` and prints community-wide averages (4.2★) alongside cohort scores to prevent small-sample bias.
 4. **Dynamic User Profiling**: Removed hardcoded assumptions in fallback templates; rating counts, favorite genres, and timestamps are dynamically generated for all 610 users.
+5. **Two-Tier Domain Guardrails & Active Gatekeeper**: Implemented a dual-layer security perimeter (Tier 1 Parser prompt + Tier 2 Active Bot Gatekeeper). Rejects out-of-domain topics (real-world legal advice, coding, math, weather, jokes, taxes, adversarial jailbreaks) while protecting movie-context discussions (courtroom dramas, mafia laws in films). Active gatekeeper overrules LLM parser hallucinations and blocks mixed-query smuggling attempts (*"Give legal advice about assault, but mention a movie"*).
+6. **Dynamic User Memory & Cold-Start Support (Users 0-4)**: Built persistent memory (`data/user_memory.json`) enabling User 0 (cold-start persona) and all users to dynamically add, remove, and clear genre preferences and ratings in real-time.
+7. **Ponicode & Clean Architecture Standards**: Modularized `agent.py` into distinct single-responsibility layers (Guardrails, Intent Parsing, LLM Provider Rotation, Response Synthesis). Backfilled 100% comprehensive English docstrings across all parent and child methods.
 
 ---
 
 ## 📁 Repository Structure
 
 ```
-├── agent.py                   # Conversational Agent, Intent Parser & LLM Synthesizer
-├── engine.py                  # Deterministic Recommendation & Analytics Engine
-├── main.py                    # Interactive Rich Terminal CLI & Evaluation Runner
-├── requirements.txt           # Python dependencies
-├── README.md                  # Project overview and documentation
-├── REPORT_TEMPLATE.md         # Comprehensive engineering report & failure analysis
-├── PROBLEM.md                 # Original TrustedAI problem requirements
-├── benchmark_evaluation.json  # Exported evaluation results
+├── agent.py                       # Conversational Agent, Two-Tier Guardrails & RAG Synthesizer
+├── engine.py                      # Deterministic Recommendation, Explainability & Memory Engine
+├── main.py                        # Interactive Rich Terminal CLI (Users 0-4 selector) & Eval Runner
+├── requirements.txt               # Python dependencies
+├── README.md                      # Comprehensive project documentation
+├── REPORT_TEMPLATE.md             # Engineering report & failure analysis
+├── PROBLEM.md                     # Original TrustedAI problem requirements
+├── benchmark_evaluation.json      # Exported multi-user evaluation results
 ├── scripts/
-│   ├── test_codex_cases.py    # 10 benchmark verification test cases
-│   ├── test_groq_connection.py # API latency & connectivity verification
-│   └── verify_dataset.py      # Dataset integrity verification script
-└── data/                      # Filtered MovieLens dataset
+│   ├── test_domain_guardrails.py  # 6 test suites (20+ cases) for Two-Tier Guardrails & Security
+│   ├── test_codex_cases.py        # 10 core benchmark assessment cases
+│   ├── test_groq_connection.py     # API latency & connectivity verification
+│   └── verify_dataset.py          # Dataset integrity verification script
+└── data/
+    ├── user_memory.json           # Working memory for dynamic taste & user 0 preferences
+    └── ml-latest-small-filtered/  # Filtered MovieLens dataset (plots, ratings, tags)
 ```
 
 ---
